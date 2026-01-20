@@ -1,23 +1,63 @@
 {
   "name": "feedcatv2",
-  "displayName": "FeedCatV2",
-  "description": "",
+  "displayName": "Feed Cat - Coding Companion",
+  "description": "A cute cat companion that lives in your VSCode. Feed it by typing code!",
   "version": "0.0.1",
+  "publisher": "feedcat",
   "engines": {
-    "vscode": "^1.108.1"
+    "vscode": "^1.74.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "feedcatv2.helloWorld",
-        "title": "Hello World"
+        "command": "feedcat.show",
+        "title": "Feed Cat: Show Cat"
+      },
+      {
+        "command": "feedcat.reset",
+        "title": "Feed Cat: Reset Counter"
+      },
+      {
+        "command": "feedcat.spawnFish",
+        "title": "Feed Cat: Spawn Fish"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "feedcat-container",
+          "title": "Feed Cat",
+          "icon": "$(heart)"
+        }
+      ]
+    },
+    "views": {
+      "feedcat-container": [
+        {
+          "type": "webview",
+          "id": "feedcat.catView",
+          "name": "🐱 Cat Companion",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Feed Cat",
+      "properties": {
+        "feedcat.fishThreshold": {
+          "type": "number",
+          "default": 1000,
+          "description": "Number of keystrokes before a fish appears"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -28,7 +68,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.108.1",
+    "@types/vscode": "^1.74.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "typescript-eslint": "^8.52.0",

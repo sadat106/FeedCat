@@ -1,71 +1,107 @@
-# feedcatv2 README
+# 🐱 Feed Cat - VS Code Coding Companion
 
-This is the README for your extension "feedcatv2". After writing up a brief description, we recommend including the following sections.
+一只可爱的小猫陪伴你编程！它住在 VS Code 底部面板中，每当你敲击键盘，小猫头顶的计数器就会增加。每敲击1000次，就会掉落一条小鱼，小猫会跑过去吃掉它！
 
-## Features
+## 🎬 效果展示
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+小猫会显示在 VS Code **底部面板区域**（和终端、问题面板同一行），包含：
+- 🌤️ 蓝天白云的可爱背景
+- 🐱 会动的像素小猫
+- ⌨️ 实时击键计数器（显示在小猫头顶）
+- 🐟 自动掉落的小鱼奖励
 
-For example if there is an image subfolder under your extension project workspace:
+## 📦 安装方法
 
-\!\[feature X\]\(images/feature-x.png\)
+### 方法一：安装 .vsix 文件（推荐）
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+1. 下载 `feedcatv2-0.0.1.vsix` 文件
+2. 在 VS Code 中按 `Ctrl+Shift+P`
+3. 输入 `Extensions: Install from VSIX...`
+4. 选择下载的 `.vsix` 文件
+5. 重新加载 VS Code
 
-## Requirements
+### 方法二：开发模式运行
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+1. 用 VS Code 打开此项目文件夹
+2. 按 `F5` 启动调试
+3. 在新打开的窗口中使用插件
 
-## Extension Settings
+## 🚀 使用方法
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+安装后，小猫面板会自动出现在底部面板区域。如果没有看到：
 
-For example:
+1. 按 `Ctrl+Shift+P`
+2. 输入 `Feed Cat: Show Cat`
+3. 或者在底部面板区域右键，选择显示 "Feed Cat" 面板
 
-This extension contributes the following settings:
+## ✨ 功能特性
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+| 功能 | 说明 |
+|------|------|
+| 🐱 精灵动画 | 小猫有多种动作：站立、走路、跑步、坐下、吃东西 |
+| ⌨️ 按键计数 | 实时统计你的击键次数，显示在小猫头顶 |
+| 🐟 小鱼奖励 | 每1000次击键，随机位置掉落一条小鱼 |
+| 🏃 智能行为 | 小猫会主动跑向小鱼并吃掉它 |
+| 🎲 随机漫游 | 空闲时小猫会随机走动或休息 |
 
-## Known Issues
+## ⚙️ 配置选项
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+在 VS Code 设置中搜索 `feedcat`：
 
-## Release Notes
+| 设置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `feedcat.fishThreshold` | `1000` | 触发小鱼掉落的击键次数 |
 
-Users appreciate release notes as you update your extension.
+## 🎮 命令列表
 
-### 1.0.0
+| 命令 | 说明 |
+|------|------|
+| `Feed Cat: Show Cat` | 显示/聚焦小猫面板 |
+| `Feed Cat: Reset Counter` | 重置击键计数器 |
+| `Feed Cat: Spawn Fish` | 手动生成一条小鱼（测试用） |
 
-Initial release of ...
+## 🛠️ 开发
 
-### 1.0.1
+```bash
+# 安装依赖
+npm install
 
-Fixed issue #.
+# 编译
+npm run compile
 
-### 1.1.0
+# 监听模式
+npm run watch
 
-Added features X, Y, and Z.
+# 打包
+npx @vscode/vsce package --allow-missing-repository
+```
+
+## 🎨 精灵图规格
+
+- 文件：`media/cat-sprite.png`
+- 尺寸：256 x 320 像素
+- 帧大小：32 x 32 像素
+- 布局：8 列 x 10 行
+- 显示尺寸：64 x 64 像素 (2x 缩放)
+
+## 📁 项目结构
+
+```
+feedcatv2/
+├── media/
+│   └── cat-sprite.png      # 小猫精灵图
+├── src/
+│   ├── extension.ts        # 插件入口
+│   └── CatViewProvider.ts  # Webview 视图提供者
+├── out/                    # 编译输出
+├── package.json            # 插件配置
+└── feedcatv2-0.0.1.vsix   # 打包好的插件
+```
+
+## 📝 许可证
+
+MIT License
 
 ---
 
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+🐱 **享受编程，喂养你的小猫伙伴！** 🐟
