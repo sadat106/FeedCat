@@ -254,6 +254,12 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         const FRAME_SIZE = 32, COLS = 8, ROWS = 10, SCALE = 1.5;
         const DISPLAY_SIZE = FRAME_SIZE * SCALE;
 
+        // 物理常量
+        const GRAVITY = 0.0004;      // 重力加速度
+        const BOUNCE_DAMPING = 0.6;  // 弹跳衰减系数
+        const GROUND_Y = 25;         // 地面高度
+        const MIN_BOUNCE_VEL = 0.02; // 最小弹跳速度，低于此值停止弹跳
+
         const ANIMS = {
             idle: { 
                 frames: [{r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3}],
@@ -293,7 +299,7 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         catEl.style.height = DISPLAY_SIZE + 'px';
         catWrapper.style.width = DISPLAY_SIZE + 'px';
 
-        let catX = 10, targetX = 10, facingLeft = false;
+        let catX = 10, facingLeft = false;
         let currentAnim = 'idle', frameIndex = 0, lastFrameTime = 0;
         let state = 'idle', stateTimer = 0, nextStateTime = 2000;
         let isEating = false, targetFish = null;
@@ -327,19 +333,91 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 
         function getBounds() {
             const rect = gameContainer.getBoundingClientRect();
-            return { minX: 5, maxX: Math.max(rect.width - DISPLAY_SIZE - 5, 60) };
+            return { 
+                minX: 5, 
+                maxX: Math.max(rect.width - DISPLAY_SIZE - 5, 60),
+                height: rect.height
+            };
         }
 
-        function spawnFish() {
+        // 鱼类 - 带物理属性
+        function createFish() {
             const bounds = getBounds();
             const x = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
+            const startY = bounds.height || 150; // 从顶部开始掉落
+            
             const fish = document.createElement('div');
             fish.className = 'fish';
             fish.textContent = '🐟';
             fish.style.left = x + 'px';
-            fish.style.bottom = '25px';
+            fish.style.bottom = startY + 'px';
             gameContainer.appendChild(fish);
-            fishes.push({ el: fish, x: x });
+            
+            // 鱼的物理状态
+            const fishObj = {
+                el: fish,
+                x: x,
+                y: startY,
+                vy: 0,                           // 垂直速度
+                vx: (Math.random() - 0.5) * 0.1, // 随机水平速度
+                bouncing: true,                   // 是否还在弹跳
+                rotation: 0                       // 旋转角度
+            };
+            
+            fishes.push(fishObj);
+            
+            // 有鱼了，猫立即去追
+            if (!isEating && state !== 'eat') {
+                targetFish = fishObj;
+                setState('run');
+            }
+        }
+
+        // 更新鱼的物理状态
+        function updateFish(fish, dt) {
+            if (!fish.bouncing) return;
+            
+            const bounds = getBounds();
+            
+            // 应用重力
+            fish.vy -= GRAVITY * dt;
+            
+            // 更新位置
+            fish.y += fish.vy * dt;
+            fish.x += fish.vx * dt;
+            
+            // 水平边界反弹
+            if (fish.x < bounds.minX) {
+                fish.x = bounds.minX;
+                fish.vx = Math.abs(fish.vx) * 0.8;
+            } else if (fish.x > bounds.maxX) {
+                fish.x = bounds.maxX;
+                fish.vx = -Math.abs(fish.vx) * 0.8;
+            }
+            
+            // 地面碰撞和弹跳
+            if (fish.y <= GROUND_Y) {
+                fish.y = GROUND_Y;
+                
+                // 如果速度足够大，弹跳
+                if (Math.abs(fish.vy) > MIN_BOUNCE_VEL) {
+                    fish.vy = -fish.vy * BOUNCE_DAMPING;
+                    // 弹跳时随机改变水平方向
+                    fish.vx = (Math.random() - 0.5) * 0.08;
+                    // 旋转效果
+                    fish.rotation += (Math.random() - 0.5) * 30;
+                } else {
+                    // 停止弹跳
+                    fish.vy = 0;
+                    fish.vx = 0;
+                    fish.bouncing = false;
+                }
+            }
+            
+            // 更新DOM
+            fish.el.style.left = fish.x + 'px';
+            fish.el.style.bottom = fish.y + 'px';
+            fish.el.style.transform = 'rotate(' + fish.rotation + 'deg)';
         }
 
         function eatFish(fish) {
@@ -361,15 +439,22 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             return nearest;
         }
 
+        // 检查猫是否能抓到鱼（鱼在地面且猫靠近）
+        function canCatchFish(fish) {
+            const dx = Math.abs(fish.x - catX);
+            // 鱼必须在较低位置（接近地面）且猫足够近
+            return dx < 15 && fish.y < GROUND_Y + 20;
+        }
+
         function decideNextAction() {
             const bounds = getBounds();
             if (fishes.length > 0 && !isEating) {
                 targetFish = findNearestFish();
-                if (targetFish) { targetX = targetFish.x; setState('run'); return; }
+                if (targetFish) { setState('run'); return; }
             }
             const r = Math.random();
-            if (r < 0.2) { targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX; setState('walk'); nextStateTime = 4000 + Math.random() * 3000; }
-            else if (r < 0.35) { targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX; setState('run'); nextStateTime = 2000 + Math.random() * 2000; }
+            if (r < 0.2) { setState('walk'); nextStateTime = 4000 + Math.random() * 3000; }
+            else if (r < 0.35) { setState('run'); nextStateTime = 2000 + Math.random() * 2000; }
             else if (r < 0.5) { setState('clean'); nextStateTime = 3000 + Math.random() * 3000; }
             else if (r < 0.65) { setState('sleep'); nextStateTime = 4000 + Math.random() * 4000; }
             else { setState('idle'); nextStateTime = 2000 + Math.random() * 2000; }
@@ -387,6 +472,11 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             const dt = timestamp - lastTime;
             lastTime = timestamp;
 
+            // 更新所有鱼的物理
+            for (let i = 0; i < fishes.length; i++) {
+                updateFish(fishes[i], dt);
+            }
+
             const anim = ANIMS[currentAnim];
             if (anim && timestamp - lastFrameTime >= anim.speed) {
                 frameIndex = (frameIndex + 1) % anim.frames.length;
@@ -395,28 +485,60 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             }
 
             stateTimer += dt;
+            const bounds = getBounds();
 
-            if (state === 'walk' || state === 'run') {
-                const speed = state === 'run' ? 0.1 : 0.04;
+            // 如果有目标鱼，持续追踪
+            if (targetFish && fishes.indexOf(targetFish) !== -1 && !isEating) {
+                // 更新目标位置（因为鱼可能在移动）
+                const targetX = targetFish.x;
                 const dx = targetX - catX;
-                if (Math.abs(dx) > 2) {
+                
+                if (state !== 'run') setState('run');
+                
+                if (Math.abs(dx) > 10) {
+                    // 还没追上，继续跑
                     facingLeft = dx < 0;
-                    catX += (dx > 0 ? 1 : -1) * speed * dt;
-                    const bounds = getBounds();
+                    catX += (dx > 0 ? 1 : -1) * 0.12 * dt;
                     catX = Math.max(bounds.minX, Math.min(bounds.maxX, catX));
-                } else {
-                    if (targetFish && fishes.indexOf(targetFish) !== -1) {
-                        isEating = true; setState('eat');
-                        setTimeout(function() {
-                            if (targetFish && fishes.indexOf(targetFish) !== -1) eatFish(targetFish);
-                            targetFish = null; isEating = false; stateTimer = 0; decideNextAction();
-                        }, 700);
-                    } else { stateTimer = nextStateTime; }
+                } else if (canCatchFish(targetFish)) {
+                    // 追上了且鱼在可捕捉位置，开始吃
+                    isEating = true;
+                    setState('eat');
+                    setTimeout(function() {
+                        if (targetFish && fishes.indexOf(targetFish) !== -1) {
+                            eatFish(targetFish);
+                        }
+                        targetFish = null;
+                        isEating = false;
+                        stateTimer = 0;
+                        // 检查是否还有其他鱼
+                        if (fishes.length > 0) {
+                            targetFish = findNearestFish();
+                            setState('run');
+                        } else {
+                            decideNextAction();
+                        }
+                    }, 700);
+                }
+                // 如果鱼还在弹跳，猫会继续追
+            } else if (state === 'walk' || state === 'run') {
+                // 没有目标鱼时的随机移动
+                if (!targetFish && fishes.length > 0 && !isEating) {
+                    targetFish = findNearestFish();
+                    if (targetFish) setState('run');
                 }
             }
 
-            if (stateTimer >= nextStateTime && !isEating) { stateTimer = 0; decideNextAction(); }
-            if ((state === 'idle' || state === 'clean' || state === 'sleep') && fishes.length > 0 && !isEating) stateTimer = nextStateTime;
+            if (stateTimer >= nextStateTime && !isEating && !targetFish) { 
+                stateTimer = 0; 
+                decideNextAction(); 
+            }
+            
+            // 空闲状态发现新鱼
+            if ((state === 'idle' || state === 'clean' || state === 'sleep') && fishes.length > 0 && !isEating) {
+                targetFish = findNearestFish();
+                if (targetFish) setState('run');
+            }
 
             updateCatPosition();
             requestAnimationFrame(gameLoop);
@@ -425,10 +547,10 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         window.addEventListener('message', function(e) {
             const msg = e.data;
             switch (msg.type) {
-                case 'keystroke': updateCounter(msg.count); if (msg.spawnFish) spawnFish(); break;
+                case 'keystroke': updateCounter(msg.count); if (msg.spawnFish) createFish(); break;
                 case 'init': updateCounter(msg.count || 0); if (msg.fishEaten !== undefined) { fishEaten = msg.fishEaten; fishCountEl.textContent = fishEaten; } break;
                 case 'reset': updateCounter(0); fishEaten = 0; fishCountEl.textContent = '0'; fishes.forEach(function(f) { f.el.remove(); }); fishes = []; break;
-                case 'spawnFish': spawnFish(); break;
+                case 'spawnFish': createFish(); break;
             }
         });
 
