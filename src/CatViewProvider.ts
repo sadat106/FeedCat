@@ -15,32 +15,37 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
     private _keystrokeCount: number = 0;
     private _totalKeystrokes: number = 0;
     private _fishEaten: number = 0;
-    private readonly _stateFilePath: string;
+    private readonly _stateFile: string;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly _globalStoragePath: string
     ) {
-        // 使用全局存储路径保存状态文件
-        this._stateFilePath = path.join(_globalStoragePath, 'cat-state.json');
+        // 使用 globalStoragePath 存储状态文件
+        this._stateFile = path.join(_globalStoragePath, 'catstate.json');
+        console.log('[FeedCat] State file path:', this._stateFile);
         
         // 确保目录存在
-        if (!fs.existsSync(_globalStoragePath)) {
-            fs.mkdirSync(_globalStoragePath, { recursive: true });
-        }
+        this._ensureStorageDir();
         
         // Load saved state immediately
         this._loadState();
-        console.log('[FeedCat] State file path:', this._stateFilePath);
-        console.log('[FeedCat] Loaded state:', this._totalKeystrokes, this._fishEaten);
+    }
+
+    private _ensureStorageDir() {
+        const dir = path.dirname(this._stateFile);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+            console.log('[FeedCat] Created storage directory:', dir);
+        }
     }
 
     private _loadState() {
         try {
-            if (fs.existsSync(this._stateFilePath)) {
-                const data = fs.readFileSync(this._stateFilePath, 'utf8');
+            if (fs.existsSync(this._stateFile)) {
+                const data = fs.readFileSync(this._stateFile, 'utf8');
                 const state: CatState = JSON.parse(data);
-                console.log('[FeedCat] Raw state from file:', state);
+                console.log('[FeedCat] Loaded state from file:', state);
                 this._totalKeystrokes = state.totalKeystrokes || 0;
                 this._keystrokeCount = state.keystrokeCount || 0;
                 this._fishEaten = state.fishEaten || 0;
@@ -54,13 +59,14 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 
     public saveState() {
         try {
+            this._ensureStorageDir();
             const state: CatState = {
                 totalKeystrokes: this._totalKeystrokes,
                 keystrokeCount: this._keystrokeCount,
                 fishEaten: this._fishEaten
             };
-            console.log('[FeedCat] Saving state to file:', state);
-            fs.writeFileSync(this._stateFilePath, JSON.stringify(state, null, 2), 'utf8');
+            fs.writeFileSync(this._stateFile, JSON.stringify(state), 'utf8');
+            console.log('[FeedCat] Saved state to file:', state);
         } catch (err) {
             console.error('[FeedCat] Error saving state:', err);
         }
@@ -222,7 +228,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             z-index: 50;
         }
         .fish.eaten { opacity: 0; }
-        
         #stats {
             position: absolute;
             top: 6px;
@@ -260,66 +265,33 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
     (function() {
         const vscode = acquireVsCodeApi();
 
-        const FRAME_SIZE = 32;
-        const COLS = 8;
-        const ROWS = 10;
-        const SCALE = 1.5;
+        const FRAME_SIZE = 32, COLS = 8, ROWS = 10, SCALE = 1.5;
         const DISPLAY_SIZE = FRAME_SIZE * SCALE;
 
         const ANIMS = {
             idle: { 
-                frames: [
-                    {r:0,c:0}, {r:0,c:1}, {r:0,c:2}, {r:0,c:3},
-                    {r:1,c:0}, {r:1,c:1}, {r:1,c:2}, {r:1,c:3}
-                ],
+                frames: [{r:0,c:0},{r:0,c:1},{r:0,c:2},{r:0,c:3},{r:1,c:0},{r:1,c:1},{r:1,c:2},{r:1,c:3}],
                 speed: 180
             },
             clean: {
-                frames: [
-                    {r:2,c:0}, {r:2,c:1}, {r:2,c:2}, {r:2,c:3},
-                    {r:3,c:0}, {r:3,c:1}, {r:3,c:2}, {r:3,c:3}
-                ],
+                frames: [{r:2,c:0},{r:2,c:1},{r:2,c:2},{r:2,c:3},{r:3,c:0},{r:3,c:1},{r:3,c:2},{r:3,c:3}],
                 speed: 150
             },
             walk: {
-                frames: [
-                    {r:4,c:0}, {r:4,c:1}, {r:4,c:2}, {r:4,c:3},
-                    {r:4,c:4}, {r:4,c:5}, {r:4,c:6}, {r:4,c:7}
-                ],
+                frames: [{r:4,c:0},{r:4,c:1},{r:4,c:2},{r:4,c:3},{r:4,c:4},{r:4,c:5},{r:4,c:6},{r:4,c:7}],
                 speed: 100
             },
             run: {
-                frames: [
-                    {r:5,c:0}, {r:5,c:1}, {r:5,c:2}, {r:5,c:3},
-                    {r:5,c:4}, {r:5,c:5}, {r:5,c:6}, {r:5,c:7}
-                ],
+                frames: [{r:5,c:0},{r:5,c:1},{r:5,c:2},{r:5,c:3},{r:5,c:4},{r:5,c:5},{r:5,c:6},{r:5,c:7}],
                 speed: 60
             },
             sleep: {
-                frames: [
-                    {r:6,c:0}, {r:6,c:1}, {r:6,c:2}, {r:6,c:3}
-                ],
+                frames: [{r:6,c:0},{r:6,c:1},{r:6,c:2},{r:6,c:3}],
                 speed: 300
             },
             eat: {
-                frames: [
-                    {r:7,c:0}, {r:7,c:1}, {r:7,c:2}, {r:7,c:3}, {r:7,c:4}, {r:7,c:5}
-                ],
+                frames: [{r:7,c:0},{r:7,c:1},{r:7,c:2},{r:7,c:3},{r:7,c:4},{r:7,c:5}],
                 speed: 120
-            },
-            jump: {
-                frames: [
-                    {r:8,c:0}, {r:8,c:1}, {r:8,c:2}, {r:8,c:3},
-                    {r:8,c:4}, {r:8,c:5}, {r:8,c:6}
-                ],
-                speed: 100
-            },
-            scared: {
-                frames: [
-                    {r:9,c:0}, {r:9,c:1}, {r:9,c:2}, {r:9,c:3},
-                    {r:9,c:4}, {r:9,c:5}, {r:9,c:6}, {r:9,c:7}
-                ],
-                speed: 80
             }
         };
 
@@ -335,24 +307,15 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         catEl.style.height = DISPLAY_SIZE + 'px';
         catWrapper.style.width = DISPLAY_SIZE + 'px';
 
-        let catX = 10;
-        let targetX = 10;
-        let facingLeft = false;
-        let currentAnim = 'idle';
-        let frameIndex = 0;
-        let lastFrameTime = 0;
-        let state = 'idle';
-        let stateTimer = 0;
-        let nextStateTime = 2000;
-        let isEating = false;
-        let targetFish = null;
-        let fishes = [];
-        let fishEaten = 0;
-        let keystrokeCount = 0;
+        let catX = 10, targetX = 10, facingLeft = false;
+        let currentAnim = 'idle', frameIndex = 0, lastFrameTime = 0;
+        let state = 'idle', stateTimer = 0, nextStateTime = 2000;
+        let isEating = false, targetFish = null;
+        let fishes = [], fishEaten = 0, keystrokeCount = 0;
 
         function setFrame(animName, index) {
             const anim = ANIMS[animName];
-            if (!anim || !anim.frames || index >= anim.frames.length) return;
+            if (!anim || index >= anim.frames.length) return;
             const frame = anim.frames[index];
             catEl.style.backgroundPosition = (-frame.c * DISPLAY_SIZE) + 'px ' + (-frame.r * DISPLAY_SIZE) + 'px';
         }
@@ -372,14 +335,8 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 
         function setState(newState) {
             state = newState;
-            switch (newState) {
-                case 'idle': setAnimation('idle'); break;
-                case 'clean': setAnimation('clean'); break;
-                case 'walk': setAnimation('walk'); break;
-                case 'run': setAnimation('run'); break;
-                case 'sleep': setAnimation('sleep'); break;
-                case 'eat': setAnimation('eat'); break;
-            }
+            const animMap = {idle:'idle',clean:'clean',walk:'walk',run:'run',sleep:'sleep',eat:'eat'};
+            if (animMap[newState]) setAnimation(animMap[newState]);
         }
 
         function getBounds() {
@@ -420,35 +377,16 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 
         function decideNextAction() {
             const bounds = getBounds();
-            
             if (fishes.length > 0 && !isEating) {
                 targetFish = findNearestFish();
-                if (targetFish) {
-                    targetX = targetFish.x;
-                    setState('run');
-                    return;
-                }
+                if (targetFish) { targetX = targetFish.x; setState('run'); return; }
             }
-
             const r = Math.random();
-            if (r < 0.2) {
-                targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
-                setState('walk');
-                nextStateTime = 4000 + Math.random() * 3000;
-            } else if (r < 0.35) {
-                targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
-                setState('run');
-                nextStateTime = 2000 + Math.random() * 2000;
-            } else if (r < 0.5) {
-                setState('clean');
-                nextStateTime = 3000 + Math.random() * 3000;
-            } else if (r < 0.65) {
-                setState('sleep');
-                nextStateTime = 4000 + Math.random() * 4000;
-            } else {
-                setState('idle');
-                nextStateTime = 2000 + Math.random() * 2000;
-            }
+            if (r < 0.2) { targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX; setState('walk'); nextStateTime = 4000 + Math.random() * 3000; }
+            else if (r < 0.35) { targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX; setState('run'); nextStateTime = 2000 + Math.random() * 2000; }
+            else if (r < 0.5) { setState('clean'); nextStateTime = 3000 + Math.random() * 3000; }
+            else if (r < 0.65) { setState('sleep'); nextStateTime = 4000 + Math.random() * 4000; }
+            else { setState('idle'); nextStateTime = 2000 + Math.random() * 2000; }
         }
 
         function updateCounter(count) {
@@ -464,12 +402,10 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             lastTime = timestamp;
 
             const anim = ANIMS[currentAnim];
-            if (anim && anim.frames) {
-                if (timestamp - lastFrameTime >= anim.speed) {
-                    frameIndex = (frameIndex + 1) % anim.frames.length;
-                    setFrame(currentAnim, frameIndex);
-                    lastFrameTime = timestamp;
-                }
+            if (anim && timestamp - lastFrameTime >= anim.speed) {
+                frameIndex = (frameIndex + 1) % anim.frames.length;
+                setFrame(currentAnim, frameIndex);
+                lastFrameTime = timestamp;
             }
 
             stateTimer += dt;
@@ -477,40 +413,24 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             if (state === 'walk' || state === 'run') {
                 const speed = state === 'run' ? 0.1 : 0.04;
                 const dx = targetX - catX;
-                
                 if (Math.abs(dx) > 2) {
                     facingLeft = dx < 0;
                     catX += (dx > 0 ? 1 : -1) * speed * dt;
                     const bounds = getBounds();
-                    if (catX < bounds.minX) catX = bounds.minX;
-                    if (catX > bounds.maxX) catX = bounds.maxX;
+                    catX = Math.max(bounds.minX, Math.min(bounds.maxX, catX));
                 } else {
                     if (targetFish && fishes.indexOf(targetFish) !== -1) {
-                        isEating = true;
-                        setState('eat');
+                        isEating = true; setState('eat');
                         setTimeout(function() {
-                            if (targetFish && fishes.indexOf(targetFish) !== -1) {
-                                eatFish(targetFish);
-                            }
-                            targetFish = null;
-                            isEating = false;
-                            stateTimer = 0;
-                            decideNextAction();
+                            if (targetFish && fishes.indexOf(targetFish) !== -1) eatFish(targetFish);
+                            targetFish = null; isEating = false; stateTimer = 0; decideNextAction();
                         }, 700);
-                    } else {
-                        stateTimer = nextStateTime;
-                    }
+                    } else { stateTimer = nextStateTime; }
                 }
             }
 
-            if (stateTimer >= nextStateTime && !isEating) {
-                stateTimer = 0;
-                decideNextAction();
-            }
-
-            if ((state === 'idle' || state === 'clean' || state === 'sleep') && fishes.length > 0 && !isEating) {
-                stateTimer = nextStateTime;
-            }
+            if (stateTimer >= nextStateTime && !isEating) { stateTimer = 0; decideNextAction(); }
+            if ((state === 'idle' || state === 'clean' || state === 'sleep') && fishes.length > 0 && !isEating) stateTimer = nextStateTime;
 
             updateCatPosition();
             requestAnimationFrame(gameLoop);
@@ -519,27 +439,10 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         window.addEventListener('message', function(e) {
             const msg = e.data;
             switch (msg.type) {
-                case 'keystroke':
-                    updateCounter(msg.count);
-                    if (msg.spawnFish) spawnFish();
-                    break;
-                case 'init':
-                    updateCounter(msg.count || 0);
-                    if (msg.fishEaten !== undefined) {
-                        fishEaten = msg.fishEaten;
-                        fishCountEl.textContent = fishEaten;
-                    }
-                    break;
-                case 'reset':
-                    updateCounter(0);
-                    fishEaten = 0;
-                    fishCountEl.textContent = '0';
-                    fishes.forEach(function(f) { f.el.remove(); });
-                    fishes = [];
-                    break;
-                case 'spawnFish':
-                    spawnFish();
-                    break;
+                case 'keystroke': updateCounter(msg.count); if (msg.spawnFish) spawnFish(); break;
+                case 'init': updateCounter(msg.count || 0); if (msg.fishEaten !== undefined) { fishEaten = msg.fishEaten; fishCountEl.textContent = fishEaten; } break;
+                case 'reset': updateCounter(0); fishEaten = 0; fishCountEl.textContent = '0'; fishes.forEach(function(f) { f.el.remove(); }); fishes = []; break;
+                case 'spawnFish': spawnFish(); break;
             }
         });
 
@@ -558,8 +461,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 function getNonce() {
     let text = '';
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
+    for (let i = 0; i < 32; i++) { text += possible.charAt(Math.floor(Math.random() * possible.length)); }
     return text;
 }
