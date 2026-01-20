@@ -5,10 +5,13 @@ let catViewProvider: CatViewProvider;
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('[FeedCat] Extension activating...');
-    console.log('[FeedCat] globalState keys:', context.globalState.keys());
+    
+    // 使用 globalStorageUri 作为持久化存储路径
+    const storagePath = context.globalStorageUri.fsPath;
+    console.log('[FeedCat] Storage path:', storagePath);
 
-    // Create the cat view provider with context for state persistence
-    catViewProvider = new CatViewProvider(context.extensionUri, context.globalState);
+    // Create the cat view provider with file-based storage
+    catViewProvider = new CatViewProvider(context.extensionUri, storagePath);
 
     // Register the webview view provider in Explorer sidebar
     context.subscriptions.push(
@@ -28,8 +31,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('feedcat.catView.focus');
     });
 
-    const resetCommand = vscode.commands.registerCommand('feedcat.reset', async () => {
-        await catViewProvider.resetCounter();
+    const resetCommand = vscode.commands.registerCommand('feedcat.reset', () => {
+        catViewProvider.resetCounter();
         vscode.window.showInformationMessage('🐱 Cat counter has been reset!');
     });
 
@@ -60,11 +63,10 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('[FeedCat] Extension activated!');
 }
 
-export async function deactivate() {
+export function deactivate() {
     console.log('[FeedCat] Extension deactivating, saving state...');
-    // Save state when deactivating
     if (catViewProvider) {
-        await catViewProvider.saveState();
+        catViewProvider.saveState();
     }
     console.log('[FeedCat] Extension deactivated');
 }
