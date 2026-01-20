@@ -4,7 +4,8 @@ import { CatViewProvider } from './CatViewProvider';
 let catViewProvider: CatViewProvider;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Feed Cat extension is now active!');
+    console.log('[FeedCat] Extension activating...');
+    console.log('[FeedCat] globalState keys:', context.globalState.keys());
 
     // Create the cat view provider with context for state persistence
     catViewProvider = new CatViewProvider(context.extensionUri, context.globalState);
@@ -27,8 +28,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('feedcat.catView.focus');
     });
 
-    const resetCommand = vscode.commands.registerCommand('feedcat.reset', () => {
-        catViewProvider.resetCounter();
+    const resetCommand = vscode.commands.registerCommand('feedcat.reset', async () => {
+        await catViewProvider.resetCounter();
         vscode.window.showInformationMessage('🐱 Cat counter has been reset!');
     });
 
@@ -55,11 +56,15 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(keystrokeDisposable);
+    
+    console.log('[FeedCat] Extension activated!');
 }
 
-export function deactivate() {
+export async function deactivate() {
+    console.log('[FeedCat] Extension deactivating, saving state...');
     // Save state when deactivating
     if (catViewProvider) {
-        catViewProvider.saveState();
+        await catViewProvider.saveState();
     }
+    console.log('[FeedCat] Extension deactivated');
 }

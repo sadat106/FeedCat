@@ -13,18 +13,20 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
     private _keystrokeCount: number = 0;
     private _totalKeystrokes: number = 0;
     private _fishEaten: number = 0;
-    private readonly _stateKey = 'feedcat.state';
+    private readonly _stateKey = 'feedcat.catState';
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly _globalState: vscode.Memento
     ) {
-        // Load saved state
+        // Load saved state immediately
         this._loadState();
+        console.log('[FeedCat] Loaded state:', this._totalKeystrokes, this._fishEaten);
     }
 
     private _loadState() {
         const state = this._globalState.get<CatState>(this._stateKey);
+        console.log('[FeedCat] Raw state from storage:', state);
         if (state) {
             this._totalKeystrokes = state.totalKeystrokes || 0;
             this._keystrokeCount = state.keystrokeCount || 0;
@@ -32,13 +34,14 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    public saveState() {
+    public async saveState() {
         const state: CatState = {
             totalKeystrokes: this._totalKeystrokes,
             keystrokeCount: this._keystrokeCount,
             fishEaten: this._fishEaten
         };
-        this._globalState.update(this._stateKey, state);
+        console.log('[FeedCat] Saving state:', state);
+        await this._globalState.update(this._stateKey, state);
     }
 
     public resolveWebviewView(
@@ -55,9 +58,10 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-        webviewView.webview.onDidReceiveMessage(message => {
+        webviewView.webview.onDidReceiveMessage(async message => {
             switch (message.type) {
                 case 'ready':
+                    console.log('[FeedCat] Webview ready, sending state:', this._totalKeystrokes, this._fishEaten);
                     // Send saved state to webview
                     this._view?.webview.postMessage({
                         type: 'init',
@@ -67,18 +71,19 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'fishEaten':
                     this._fishEaten = message.count;
-                    this.saveState();
+                    await this.saveState();
                     break;
             }
         });
 
         // Save state when view is disposed
-        webviewView.onDidDispose(() => {
-            this.saveState();
+        webviewView.onDidDispose(async () => {
+            console.log('[FeedCat] View disposed, saving state');
+            await this.saveState();
         });
     }
 
-    public onKeystroke() {
+    public async onKeystroke() {
         this._keystrokeCount++;
         this._totalKeystrokes++;
         
@@ -97,20 +102,20 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             spawnFish: spawnFish
         });
 
-        // Save state periodically (every 100 keystrokes)
-        if (this._totalKeystrokes % 100 === 0) {
-            this.saveState();
+        // Save state every 50 keystrokes
+        if (this._totalKeystrokes % 50 === 0) {
+            await this.saveState();
         }
     }
 
-    public resetCounter() {
+    public async resetCounter() {
         this._keystrokeCount = 0;
         this._totalKeystrokes = 0;
         this._fishEaten = 0;
         this._view?.webview.postMessage({
             type: 'reset'
         });
-        this.saveState();
+        await this.saveState();
     }
 
     public spawnFish() {
@@ -236,26 +241,13 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
     (function() {
         const vscode = acquireVsCodeApi();
 
-        // 精灵图配置: 256x320, 8列x10行, 每帧32x32
+        // 精灵图配置
         const FRAME_SIZE = 32;
         const COLS = 8;
         const ROWS = 10;
         const SCALE = 1.5;
-        const DISPLAY_SIZE = FRAME_SIZE * SCALE; // 48px
+        const DISPLAY_SIZE = FRAME_SIZE * SCALE;
 
-        /*
-         * 精灵图布局:
-         * Row 0: Idle 1 - 4帧
-         * Row 1: Idle 2 - 4帧
-         * Row 2: Clean 1 - 4帧
-         * Row 3: Clean 2 - 4帧
-         * Row 4: Walk - 8帧
-         * Row 5: Run - 8帧
-         * Row 6: Sleep - 4帧
-         * Row 7: Paw/Eat - 6帧
-         * Row 8: Jump - 7帧
-         * Row 9: Scared - 8帧
-         */
         const ANIMS = {
             idle: { 
                 frames: [
@@ -343,24 +335,20 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         let fishEaten = 0;
         let keystrokeCount = 0;
 
-        // 设置精灵帧
         function setFrame(animName, index) {
             const anim = ANIMS[animName];
             if (!anim || !anim.frames || index >= anim.frames.length) return;
-            
             const frame = anim.frames[index];
             const bgX = -frame.c * DISPLAY_SIZE;
             const bgY = -frame.r * DISPLAY_SIZE;
             catEl.style.backgroundPosition = bgX + 'px ' + bgY + 'px';
         }
 
-        // 更新猫位置
         function updateCatPosition() {
             catWrapper.style.left = catX + 'px';
             catEl.style.transform = facingLeft ? 'scaleX(-1)' : 'scaleX(1)';
         }
 
-        // 切换动画
         function setAnimation(name) {
             if (currentAnim === name) return;
             currentAnim = name;
@@ -369,7 +357,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             setFrame(name, 0);
         }
 
-        // 切换状态
         function setState(newState) {
             state = newState;
             switch (newState) {
@@ -382,13 +369,11 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             }
         }
 
-        // 获取边界
         function getBounds() {
             const rect = gameContainer.getBoundingClientRect();
             return { minX: 5, maxX: Math.max(rect.width - DISPLAY_SIZE - 5, 60) };
         }
 
-        // 生成鱼
         function spawnFish() {
             const bounds = getBounds();
             const x = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
@@ -401,18 +386,15 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             fishes.push({ el: fish, x: x });
         }
 
-        // 吃鱼
         function eatFish(fish) {
             fish.el.classList.add('eaten');
             setTimeout(function() { fish.el.remove(); }, 300);
             fishes = fishes.filter(function(f) { return f !== fish; });
             fishEaten++;
             fishCountEl.textContent = fishEaten;
-            // 通知扩展更新鱼的计数
             vscode.postMessage({ type: 'fishEaten', count: fishEaten });
         }
 
-        // 找最近的鱼
         function findNearestFish() {
             if (!fishes.length) return null;
             let nearest = null, minD = Infinity;
@@ -423,7 +405,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             return nearest;
         }
 
-        // 决定下一个行为
         function decideNextAction() {
             const bounds = getBounds();
             
@@ -457,21 +438,18 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             }
         }
 
-        // 更新计数器
         function updateCounter(count) {
             keystrokeCount = count;
             counterEl.textContent = count;
             keystrokeCountEl.textContent = count.toLocaleString();
         }
 
-        // 主循环
         let lastTime = 0;
         function gameLoop(timestamp) {
             if (!lastTime) lastTime = timestamp;
             const dt = timestamp - lastTime;
             lastTime = timestamp;
 
-            // 更新动画帧
             const anim = ANIMS[currentAnim];
             if (anim && anim.frames) {
                 if (timestamp - lastFrameTime >= anim.speed) {
@@ -483,7 +461,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 
             stateTimer += dt;
 
-            // 处理移动
             if (state === 'walk' || state === 'run') {
                 const speed = state === 'run' ? 0.1 : 0.04;
                 const dx = targetX - catX;
@@ -529,14 +506,15 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         // 消息处理
         window.addEventListener('message', function(e) {
             const msg = e.data;
+            console.log('[FeedCat WebView] Received message:', msg.type, msg);
             switch (msg.type) {
                 case 'keystroke':
                     updateCounter(msg.count);
                     if (msg.spawnFish) spawnFish();
                     break;
                 case 'init':
-                    // 恢复保存的状态
-                    updateCounter(msg.count);
+                    console.log('[FeedCat WebView] Init with count:', msg.count, 'fishEaten:', msg.fishEaten);
+                    updateCounter(msg.count || 0);
                     if (msg.fishEaten !== undefined) {
                         fishEaten = msg.fishEaten;
                         fishCountEl.textContent = fishEaten;
@@ -560,6 +538,9 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         updateCatPosition();
         setTimeout(decideNextAction, 1000);
         requestAnimationFrame(gameLoop);
+        
+        // 通知扩展已就绪
+        console.log('[FeedCat WebView] Sending ready message');
         vscode.postMessage({ type: 'ready' });
     })();
     </script>
