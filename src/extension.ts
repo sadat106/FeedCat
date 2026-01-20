@@ -6,8 +6,8 @@ let catViewProvider: CatViewProvider;
 export function activate(context: vscode.ExtensionContext) {
     console.log('Feed Cat extension is now active!');
 
-    // Create the cat view provider
-    catViewProvider = new CatViewProvider(context.extensionUri);
+    // Create the cat view provider with context for state persistence
+    catViewProvider = new CatViewProvider(context.extensionUri, context.globalState);
 
     // Register the webview view provider in Explorer sidebar
     context.subscriptions.push(
@@ -57,4 +57,9 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(keystrokeDisposable);
 }
 
-export function deactivate() {}
+export function deactivate() {
+    // Save state when deactivating
+    if (catViewProvider) {
+        catViewProvider.saveState();
+    }
+}

@@ -1,13 +1,45 @@
 import * as vscode from 'vscode';
 
+interface CatState {
+    totalKeystrokes: number;
+    keystrokeCount: number;
+    fishEaten: number;
+}
+
 export class CatViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'feedcat.catView';
     
     private _view?: vscode.WebviewView;
     private _keystrokeCount: number = 0;
     private _totalKeystrokes: number = 0;
+    private _fishEaten: number = 0;
+    private readonly _stateKey = 'feedcat.state';
 
-    constructor(private readonly _extensionUri: vscode.Uri) {}
+    constructor(
+        private readonly _extensionUri: vscode.Uri,
+        private readonly _globalState: vscode.Memento
+    ) {
+        // Load saved state
+        this._loadState();
+    }
+
+    private _loadState() {
+        const state = this._globalState.get<CatState>(this._stateKey);
+        if (state) {
+            this._totalKeystrokes = state.totalKeystrokes || 0;
+            this._keystrokeCount = state.keystrokeCount || 0;
+            this._fishEaten = state.fishEaten || 0;
+        }
+    }
+
+    public saveState() {
+        const state: CatState = {
+            totalKeystrokes: this._totalKeystrokes,
+            keystrokeCount: this._keystrokeCount,
+            fishEaten: this._fishEaten
+        };
+        this._globalState.update(this._stateKey, state);
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -26,12 +58,23 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage(message => {
             switch (message.type) {
                 case 'ready':
+                    // Send saved state to webview
                     this._view?.webview.postMessage({
                         type: 'init',
-                        count: this._totalKeystrokes
+                        count: this._totalKeystrokes,
+                        fishEaten: this._fishEaten
                     });
                     break;
+                case 'fishEaten':
+                    this._fishEaten = message.count;
+                    this.saveState();
+                    break;
             }
+        });
+
+        // Save state when view is disposed
+        webviewView.onDidDispose(() => {
+            this.saveState();
         });
     }
 
@@ -53,14 +96,21 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             count: this._totalKeystrokes,
             spawnFish: spawnFish
         });
+
+        // Save state periodically (every 100 keystrokes)
+        if (this._totalKeystrokes % 100 === 0) {
+            this.saveState();
+        }
     }
 
     public resetCounter() {
         this._keystrokeCount = 0;
         this._totalKeystrokes = 0;
+        this._fishEaten = 0;
         this._view?.webview.postMessage({
             type: 'reset'
         });
+        this.saveState();
     }
 
     public spawnFish() {
@@ -95,20 +145,20 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             background: linear-gradient(180deg, #7CB342 0%, #558B2F 100%);
         }
         .sun {
-            position: absolute; top: 5px; right: 10px; width: 20px; height: 20px;
+            position: absolute; top: 8px; right: 12px; width: 24px; height: 24px;
             background: radial-gradient(circle, #FFD54F 0%, #FF9800 100%);
-            border-radius: 50%; box-shadow: 0 0 10px #FFD54F;
+            border-radius: 50%; box-shadow: 0 0 12px #FFD54F;
         }
         .cloud {
-            position: absolute; top: 8px; left: 10px; width: 25px; height: 10px;
-            background: white; border-radius: 10px; opacity: 0.9;
+            position: absolute; top: 12px; left: 12px; width: 30px; height: 12px;
+            background: white; border-radius: 12px; opacity: 0.9;
         }
         .cloud::before {
-            content: ''; position: absolute; width: 12px; height: 12px;
-            background: white; border-radius: 50%; top: -6px; left: 5px;
+            content: ''; position: absolute; width: 14px; height: 14px;
+            background: white; border-radius: 50%; top: -7px; left: 6px;
         }
         #game-container {
-            position: absolute; bottom: 0; left: 0; right: 0; top: 30px;
+            position: absolute; bottom: 0; left: 0; right: 0; top: 45px;
         }
         #cat-wrapper {
             position: absolute;
@@ -132,35 +182,49 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             top: 0;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             color: #FFD700;
-            padding: 2px 6px;
-            border-radius: 8px;
-            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 11px;
             font-weight: bold;
             white-space: nowrap;
-            border: 1px solid #FFD700;
+            border: 1.5px solid #FFD700;
         }
         .fish {
             position: absolute;
-            font-size: 16px;
+            font-size: 18px;
             z-index: 50;
         }
         .fish.eaten { opacity: 0; }
+        
+        /* 增大的状态栏 */
         #stats {
-            position: absolute; top: 3px; left: 50%; transform: translateX(-50%);
-            color: white; font-size: 9px; z-index: 200;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
-            background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 8px;
+            position: absolute;
+            top: 6px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 200;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.5);
+            padding: 5px 14px;
+            border-radius: 12px;
+            white-space: nowrap;
         }
-        #stats span { color: #FFD700; font-weight: bold; }
+        #stats span {
+            color: #FFD700;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="sun"></div>
     <div class="cloud"></div>
     <div class="ground"></div>
-    <div id="stats">⌨️ <span id="keystroke-count">0</span> | 🐟 <span id="fish-count">0</span></div>
+    <div id="stats">⌨️ <span id="keystroke-count">0</span> &nbsp;|&nbsp; 🐟 <span id="fish-count">0</span></div>
     <div id="game-container">
         <div id="cat-wrapper">
             <div id="counter">0</div>
@@ -180,40 +244,35 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         const DISPLAY_SIZE = FRAME_SIZE * SCALE; // 48px
 
         /*
-         * 精灵图布局 (根据用户提供的精确帧数):
-         * Row 0: Idle 1      - 4 帧
-         * Row 1: Idle 2      - 4 帧
-         * Row 2: Clean 1     - 4 帧
-         * Row 3: Clean 2     - 4 帧
-         * Row 4: Movement 1  - 8 帧 (walk)
-         * Row 5: Movement 2  - 8 帧 (run)
-         * Row 6: Sleep       - 4 帧
-         * Row 7: Paw         - 6 帧 (eat)
-         * Row 8: Jump        - 7 帧
-         * Row 9: Scared      - 8 帧
+         * 精灵图布局:
+         * Row 0: Idle 1 - 4帧
+         * Row 1: Idle 2 - 4帧
+         * Row 2: Clean 1 - 4帧
+         * Row 3: Clean 2 - 4帧
+         * Row 4: Walk - 8帧
+         * Row 5: Run - 8帧
+         * Row 6: Sleep - 4帧
+         * Row 7: Paw/Eat - 6帧
+         * Row 8: Jump - 7帧
+         * Row 9: Scared - 8帧
          */
         const ANIMS = {
             idle: { 
                 frames: [
-                    // Row 0: 4帧
                     {r:0,c:0}, {r:0,c:1}, {r:0,c:2}, {r:0,c:3},
-                    // Row 1: 4帧
                     {r:1,c:0}, {r:1,c:1}, {r:1,c:2}, {r:1,c:3}
                 ],
                 speed: 180
             },
             clean: {
                 frames: [
-                    // Row 2: 4帧
                     {r:2,c:0}, {r:2,c:1}, {r:2,c:2}, {r:2,c:3},
-                    // Row 3: 4帧
                     {r:3,c:0}, {r:3,c:1}, {r:3,c:2}, {r:3,c:3}
                 ],
                 speed: 150
             },
             walk: {
                 frames: [
-                    // Row 4: 8帧
                     {r:4,c:0}, {r:4,c:1}, {r:4,c:2}, {r:4,c:3},
                     {r:4,c:4}, {r:4,c:5}, {r:4,c:6}, {r:4,c:7}
                 ],
@@ -221,7 +280,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             },
             run: {
                 frames: [
-                    // Row 5: 8帧
                     {r:5,c:0}, {r:5,c:1}, {r:5,c:2}, {r:5,c:3},
                     {r:5,c:4}, {r:5,c:5}, {r:5,c:6}, {r:5,c:7}
                 ],
@@ -229,21 +287,18 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             },
             sleep: {
                 frames: [
-                    // Row 6: 4帧
                     {r:6,c:0}, {r:6,c:1}, {r:6,c:2}, {r:6,c:3}
                 ],
                 speed: 300
             },
             eat: {
                 frames: [
-                    // Row 7: 6帧
                     {r:7,c:0}, {r:7,c:1}, {r:7,c:2}, {r:7,c:3}, {r:7,c:4}, {r:7,c:5}
                 ],
                 speed: 120
             },
             jump: {
                 frames: [
-                    // Row 8: 7帧
                     {r:8,c:0}, {r:8,c:1}, {r:8,c:2}, {r:8,c:3},
                     {r:8,c:4}, {r:8,c:5}, {r:8,c:6}
                 ],
@@ -251,7 +306,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             },
             scared: {
                 frames: [
-                    // Row 9: 8帧
                     {r:9,c:0}, {r:9,c:1}, {r:9,c:2}, {r:9,c:3},
                     {r:9,c:4}, {r:9,c:5}, {r:9,c:6}, {r:9,c:7}
                 ],
@@ -354,6 +408,8 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             fishes = fishes.filter(function(f) { return f !== fish; });
             fishEaten++;
             fishCountEl.textContent = fishEaten;
+            // 通知扩展更新鱼的计数
+            vscode.postMessage({ type: 'fishEaten', count: fishEaten });
         }
 
         // 找最近的鱼
@@ -479,7 +535,12 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
                     if (msg.spawnFish) spawnFish();
                     break;
                 case 'init':
+                    // 恢复保存的状态
                     updateCounter(msg.count);
+                    if (msg.fishEaten !== undefined) {
+                        fishEaten = msg.fishEaten;
+                        fishCountEl.textContent = fishEaten;
+                    }
                     break;
                 case 'reset':
                     updateCounter(0);
