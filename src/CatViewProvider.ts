@@ -145,9 +145,8 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             position: absolute;
             font-size: 16px;
             z-index: 50;
-            transition: opacity 0.3s;
         }
-        .fish.eaten { opacity: 0; transform: scale(0); }
+        .fish.eaten { opacity: 0; }
         #stats {
             position: absolute; top: 3px; left: 50%; transform: translateX(-50%);
             color: white; font-size: 9px; z-index: 200;
@@ -174,34 +173,91 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         const vscode = acquireVsCodeApi();
 
         // 精灵图配置: 256x320, 8列x10行, 每帧32x32
-        const FRAME_W = 32, FRAME_H = 32, COLS = 8, SCALE = 1.5;
-        const DISPLAY_W = FRAME_W * SCALE, DISPLAY_H = FRAME_H * SCALE;
+        const FRAME_SIZE = 32;
+        const COLS = 8;
+        const ROWS = 10;
+        const SCALE = 1.5;
+        const DISPLAY_SIZE = FRAME_SIZE * SCALE; // 48px
 
-        // 动画行定义
-        // Row 0-1: Idle, Row 2-3: Clean, Row 4-5: Movement, Row 6: Sleep, Row 7: Paw, Row 8: Jump, Row 9: Scared
+        /*
+         * 精灵图布局 (根据用户提供的精确帧数):
+         * Row 0: Idle 1      - 4 帧
+         * Row 1: Idle 2      - 4 帧
+         * Row 2: Clean 1     - 4 帧
+         * Row 3: Clean 2     - 4 帧
+         * Row 4: Movement 1  - 8 帧 (walk)
+         * Row 5: Movement 2  - 8 帧 (run)
+         * Row 6: Sleep       - 4 帧
+         * Row 7: Paw         - 6 帧 (eat)
+         * Row 8: Jump        - 7 帧
+         * Row 9: Scared      - 8 帧
+         */
         const ANIMS = {
-            idle:  { startRow: 0, rowCount: 2, framesPerRow: 8, speed: 150 },
-            clean: { startRow: 2, rowCount: 2, framesPerRow: 8, speed: 120 },
-            walk:  { startRow: 4, rowCount: 1, framesPerRow: 8, speed: 100 },
-            run:   { startRow: 5, rowCount: 1, framesPerRow: 8, speed: 60 },
-            sleep: { startRow: 6, rowCount: 1, framesPerRow: 8, speed: 250 },
-            eat:   { startRow: 7, rowCount: 1, framesPerRow: 8, speed: 100 },
-            jump:  { startRow: 8, rowCount: 1, framesPerRow: 8, speed: 80 },
-            scared:{ startRow: 9, rowCount: 1, framesPerRow: 8, speed: 60 }
+            idle: { 
+                frames: [
+                    // Row 0: 4帧
+                    {r:0,c:0}, {r:0,c:1}, {r:0,c:2}, {r:0,c:3},
+                    // Row 1: 4帧
+                    {r:1,c:0}, {r:1,c:1}, {r:1,c:2}, {r:1,c:3}
+                ],
+                speed: 180
+            },
+            clean: {
+                frames: [
+                    // Row 2: 4帧
+                    {r:2,c:0}, {r:2,c:1}, {r:2,c:2}, {r:2,c:3},
+                    // Row 3: 4帧
+                    {r:3,c:0}, {r:3,c:1}, {r:3,c:2}, {r:3,c:3}
+                ],
+                speed: 150
+            },
+            walk: {
+                frames: [
+                    // Row 4: 8帧
+                    {r:4,c:0}, {r:4,c:1}, {r:4,c:2}, {r:4,c:3},
+                    {r:4,c:4}, {r:4,c:5}, {r:4,c:6}, {r:4,c:7}
+                ],
+                speed: 100
+            },
+            run: {
+                frames: [
+                    // Row 5: 8帧
+                    {r:5,c:0}, {r:5,c:1}, {r:5,c:2}, {r:5,c:3},
+                    {r:5,c:4}, {r:5,c:5}, {r:5,c:6}, {r:5,c:7}
+                ],
+                speed: 60
+            },
+            sleep: {
+                frames: [
+                    // Row 6: 4帧
+                    {r:6,c:0}, {r:6,c:1}, {r:6,c:2}, {r:6,c:3}
+                ],
+                speed: 300
+            },
+            eat: {
+                frames: [
+                    // Row 7: 6帧
+                    {r:7,c:0}, {r:7,c:1}, {r:7,c:2}, {r:7,c:3}, {r:7,c:4}, {r:7,c:5}
+                ],
+                speed: 120
+            },
+            jump: {
+                frames: [
+                    // Row 8: 7帧
+                    {r:8,c:0}, {r:8,c:1}, {r:8,c:2}, {r:8,c:3},
+                    {r:8,c:4}, {r:8,c:5}, {r:8,c:6}
+                ],
+                speed: 100
+            },
+            scared: {
+                frames: [
+                    // Row 9: 8帧
+                    {r:9,c:0}, {r:9,c:1}, {r:9,c:2}, {r:9,c:3},
+                    {r:9,c:4}, {r:9,c:5}, {r:9,c:6}, {r:9,c:7}
+                ],
+                speed: 80
+            }
         };
-
-        // 获取动画的总帧数
-        function getTotalFrames(anim) {
-            return anim.rowCount * anim.framesPerRow;
-        }
-
-        // 根据帧索引获取行列
-        function getFramePos(anim, frameIndex) {
-            const localFrame = frameIndex % getTotalFrames(anim);
-            const rowOffset = Math.floor(localFrame / anim.framesPerRow);
-            const col = localFrame % anim.framesPerRow;
-            return { row: anim.startRow + rowOffset, col: col };
-        }
 
         // DOM
         const catEl = document.getElementById('cat');
@@ -212,10 +268,10 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         const keystrokeCountEl = document.getElementById('keystroke-count');
 
         // 初始化精灵图尺寸
-        catEl.style.backgroundSize = (COLS * DISPLAY_W) + 'px ' + (10 * DISPLAY_H) + 'px';
-        catEl.style.width = DISPLAY_W + 'px';
-        catEl.style.height = DISPLAY_H + 'px';
-        catWrapper.style.width = DISPLAY_W + 'px';
+        catEl.style.backgroundSize = (COLS * DISPLAY_SIZE) + 'px ' + (ROWS * DISPLAY_SIZE) + 'px';
+        catEl.style.width = DISPLAY_SIZE + 'px';
+        catEl.style.height = DISPLAY_SIZE + 'px';
+        catWrapper.style.width = DISPLAY_SIZE + 'px';
 
         // 游戏状态
         let catX = 10;
@@ -224,7 +280,7 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         let currentAnim = 'idle';
         let frameIndex = 0;
         let lastFrameTime = 0;
-        let state = 'idle'; // idle, clean, walk, run, sleep, eat
+        let state = 'idle';
         let stateTimer = 0;
         let nextStateTime = 2000;
         let isEating = false;
@@ -233,17 +289,18 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         let fishEaten = 0;
         let keystrokeCount = 0;
 
-        // 设置精灵帧 - 最关键的函数，直接设置背景位置
-        function setFrame(anim, index) {
-            const a = ANIMS[anim];
-            if (!a) return;
-            const pos = getFramePos(a, index);
-            const bgX = -pos.col * DISPLAY_W;
-            const bgY = -pos.row * DISPLAY_H;
+        // 设置精灵帧
+        function setFrame(animName, index) {
+            const anim = ANIMS[animName];
+            if (!anim || !anim.frames || index >= anim.frames.length) return;
+            
+            const frame = anim.frames[index];
+            const bgX = -frame.c * DISPLAY_SIZE;
+            const bgY = -frame.r * DISPLAY_SIZE;
             catEl.style.backgroundPosition = bgX + 'px ' + bgY + 'px';
         }
 
-        // 设置猫的位置 - 使用 left 而非 transform，翻转用单独的 scaleX
+        // 更新猫位置
         function updateCatPosition() {
             catWrapper.style.left = catX + 'px';
             catEl.style.transform = facingLeft ? 'scaleX(-1)' : 'scaleX(1)';
@@ -254,6 +311,7 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             if (currentAnim === name) return;
             currentAnim = name;
             frameIndex = 0;
+            lastFrameTime = 0;
             setFrame(name, 0);
         }
 
@@ -273,7 +331,7 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         // 获取边界
         function getBounds() {
             const rect = gameContainer.getBoundingClientRect();
-            return { minX: 5, maxX: Math.max(rect.width - DISPLAY_W - 5, 60) };
+            return { minX: 5, maxX: Math.max(rect.width - DISPLAY_SIZE - 5, 60) };
         }
 
         // 生成鱼
@@ -292,8 +350,8 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         // 吃鱼
         function eatFish(fish) {
             fish.el.classList.add('eaten');
-            setTimeout(() => fish.el.remove(), 300);
-            fishes = fishes.filter(f => f !== fish);
+            setTimeout(function() { fish.el.remove(); }, 300);
+            fishes = fishes.filter(function(f) { return f !== fish; });
             fishEaten++;
             fishCountEl.textContent = fishEaten;
         }
@@ -302,9 +360,9 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         function findNearestFish() {
             if (!fishes.length) return null;
             let nearest = null, minD = Infinity;
-            for (const f of fishes) {
-                const d = Math.abs(f.x - catX);
-                if (d < minD) { minD = d; nearest = f; }
+            for (let i = 0; i < fishes.length; i++) {
+                const d = Math.abs(fishes[i].x - catX);
+                if (d < minD) { minD = d; nearest = fishes[i]; }
             }
             return nearest;
         }
@@ -313,7 +371,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         function decideNextAction() {
             const bounds = getBounds();
             
-            // 有鱼就去吃
             if (fishes.length > 0 && !isEating) {
                 targetFish = findNearestFish();
                 if (targetFish) {
@@ -323,7 +380,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
                 }
             }
 
-            // 随机行为
             const r = Math.random();
             if (r < 0.2) {
                 targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
@@ -352,23 +408,23 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             keystrokeCountEl.textContent = count.toLocaleString();
         }
 
-        // 主循环 - 使用固定时间步长避免闪烁
+        // 主循环
         let lastTime = 0;
         function gameLoop(timestamp) {
-            // 计算时间差
             if (!lastTime) lastTime = timestamp;
             const dt = timestamp - lastTime;
             lastTime = timestamp;
 
             // 更新动画帧
             const anim = ANIMS[currentAnim];
-            if (anim && timestamp - lastFrameTime >= anim.speed) {
-                frameIndex = (frameIndex + 1) % getTotalFrames(anim);
-                setFrame(currentAnim, frameIndex);
-                lastFrameTime = timestamp;
+            if (anim && anim.frames) {
+                if (timestamp - lastFrameTime >= anim.speed) {
+                    frameIndex = (frameIndex + 1) % anim.frames.length;
+                    setFrame(currentAnim, frameIndex);
+                    lastFrameTime = timestamp;
+                }
             }
 
-            // 更新状态计时
             stateTimer += dt;
 
             // 处理移动
@@ -378,36 +434,34 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
                 
                 if (Math.abs(dx) > 2) {
                     facingLeft = dx < 0;
-                    catX += Math.sign(dx) * speed * dt;
+                    catX += (dx > 0 ? 1 : -1) * speed * dt;
                     const bounds = getBounds();
-                    catX = Math.max(bounds.minX, Math.min(bounds.maxX, catX));
+                    if (catX < bounds.minX) catX = bounds.minX;
+                    if (catX > bounds.maxX) catX = bounds.maxX;
                 } else {
-                    // 到达目标
-                    if (targetFish && fishes.includes(targetFish)) {
+                    if (targetFish && fishes.indexOf(targetFish) !== -1) {
                         isEating = true;
                         setState('eat');
-                        setTimeout(() => {
-                            if (targetFish && fishes.includes(targetFish)) {
+                        setTimeout(function() {
+                            if (targetFish && fishes.indexOf(targetFish) !== -1) {
                                 eatFish(targetFish);
                             }
                             targetFish = null;
                             isEating = false;
                             stateTimer = 0;
                             decideNextAction();
-                        }, 600);
+                        }, 700);
                     } else {
-                        stateTimer = nextStateTime; // 触发状态切换
+                        stateTimer = nextStateTime;
                     }
                 }
             }
 
-            // 检查是否需要切换状态
             if (stateTimer >= nextStateTime && !isEating) {
                 stateTimer = 0;
                 decideNextAction();
             }
 
-            // 空闲时发现鱼
             if ((state === 'idle' || state === 'clean' || state === 'sleep') && fishes.length > 0 && !isEating) {
                 stateTimer = nextStateTime;
             }
@@ -417,7 +471,7 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         }
 
         // 消息处理
-        window.addEventListener('message', e => {
+        window.addEventListener('message', function(e) {
             const msg = e.data;
             switch (msg.type) {
                 case 'keystroke':
@@ -431,7 +485,7 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
                     updateCounter(0);
                     fishEaten = 0;
                     fishCountEl.textContent = '0';
-                    fishes.forEach(f => f.el.remove());
+                    fishes.forEach(function(f) { f.el.remove(); });
                     fishes = [];
                     break;
                 case 'spawnFish':
@@ -443,7 +497,7 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         // 初始化
         setFrame('idle', 0);
         updateCatPosition();
-        setTimeout(() => decideNextAction(), 1000);
+        setTimeout(decideNextAction, 1000);
         requestAnimationFrame(gameLoop);
         vscode.postMessage({ type: 'ready' });
     })();
