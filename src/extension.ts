@@ -9,7 +9,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Create the cat view provider
     catViewProvider = new CatViewProvider(context.extensionUri);
 
-    // Register the webview view provider
+    // Register the webview view provider in Explorer sidebar
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
             CatViewProvider.viewType,
@@ -55,11 +55,6 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(keystrokeDisposable);
-
-    // Show welcome message
-    vscode.window.showInformationMessage(
-        '🐱 Feed Cat is ready! Click the ❤️ heart icon in the Activity Bar (left side)!'
-    );
 }
 
 export function deactivate() {}

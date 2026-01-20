@@ -2,7 +2,7 @@
   "name": "feedcatv2",
   "displayName": "Feed Cat - Coding Companion",
   "description": "A cute cat companion that lives in your VSCode. Feed it by typing code!",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "feedcat",
   "engines": {
     "vscode": "^1.74.0"
@@ -29,17 +29,8 @@
         "title": "Feed Cat: Spawn Fish"
       }
     ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "feedcat-container",
-          "title": "Feed Cat",
-          "icon": "$(heart)"
-        }
-      ]
-    },
     "views": {
-      "feedcat-container": [
+      "explorer": [
         {
           "type": "webview",
           "id": "feedcat.catView",
