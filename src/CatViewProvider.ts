@@ -107,7 +107,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             font-family: 'Segoe UI', sans-serif;
         }
 
-        /* Ground */
         .ground {
             position: absolute;
             bottom: 0;
@@ -117,7 +116,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             background: linear-gradient(180deg, #7CB342 0%, #558B2F 100%);
         }
 
-        /* Sun */
         .sun {
             position: absolute;
             top: 5px;
@@ -129,7 +127,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             box-shadow: 0 0 10px #FFD54F;
         }
 
-        /* Cloud */
         .cloud {
             position: absolute;
             top: 8px;
@@ -151,7 +148,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             left: 5px;
         }
 
-        /* Game container - fills most of the view */
         #game-container {
             position: absolute;
             bottom: 0;
@@ -160,31 +156,26 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             top: 30px;
         }
 
-        /* Cat container */
         #cat-container {
             position: absolute;
             bottom: 5px;
-            left: 10px;
             width: 48px;
             height: 48px;
+            /* 使用 transform 而不是 left 来移动，避免闪烁 */
+            will-change: transform;
         }
 
-        /* Cat sprite - smaller size for compact view */
         #cat {
             width: 48px;
             height: 48px;
             background-image: url('${spriteUri}');
-            background-size: 384px 480px;
             background-repeat: no-repeat;
             image-rendering: pixelated;
-            transform-origin: center bottom;
+            image-rendering: crisp-edges;
+            /* 预加载精灵图，避免闪烁 */
+            will-change: background-position;
         }
 
-        #cat.flip {
-            transform: scaleX(-1);
-        }
-
-        /* Counter above cat */
         #counter {
             position: absolute;
             top: -20px;
@@ -201,12 +192,11 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             border: 1px solid #FFD700;
         }
 
-        /* Fish */
         .fish {
             position: absolute;
             font-size: 16px;
             z-index: 50;
-            filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.3));
+            will-change: transform, opacity;
         }
 
         .fish.eaten {
@@ -227,7 +217,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             animation: fishDrop 0.3s ease-out forwards;
         }
 
-        /* Stats in corner */
         #stats {
             position: absolute;
             top: 3px;
@@ -265,211 +254,459 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
     </div>
 
     <script nonce="${nonce}">
-        const vscode = acquireVsCodeApi();
+        (function() {
+            'use strict';
+            
+            const vscode = acquireVsCodeApi();
 
-        // Sprite config - 1.5x scale (32->48)
-        const FRAME_SIZE = 32;
-        const SCALE = 1.5;
-        const SCALED_SIZE = FRAME_SIZE * SCALE;
-        const COLS = 8;
+            // ========== 精灵图配置 ==========
+            // 精灵图: 256x320, 8列x10行, 每帧32x32
+            // Row 0-1: Idle (空闲)
+            // Row 2-3: Clean (清洁/舔毛) 
+            // Row 4-5: Movement (移动)
+            // Row 6: Sleep (睡觉)
+            // Row 7: Paw (挥爪/吃东西)
+            // Row 8: Jump (跳跃)
+            // Row 9: Scared (受惊)
+            
+            const SPRITE = {
+                frameSize: 32,
+                scale: 1.5,
+                cols: 8,
+                rows: 10
+            };
+            const DISPLAY_SIZE = SPRITE.frameSize * SPRITE.scale; // 48px
 
-        const ANIMATIONS = {
-            idle: { row: 0, frames: 4, speed: 200 },
-            sit: { row: 1, frames: 4, speed: 300 },
-            walk: { row: 2, frames: 8, speed: 100 },
-            run: { row: 3, frames: 8, speed: 60 },
-            eat: { row: 5, frames: 4, speed: 150 }
-        };
+            // 动画定义 - 每个动画可以跨多行
+            const ANIMATIONS = {
+                idle: {
+                    frames: [
+                        { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 },
+                        { row: 0, col: 4 }, { row: 0, col: 5 }, { row: 0, col: 6 }, { row: 0, col: 7 },
+                        { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 3 },
+                        { row: 1, col: 4 }, { row: 1, col: 5 }, { row: 1, col: 6 }, { row: 1, col: 7 }
+                    ],
+                    speed: 150
+                },
+                clean: {
+                    frames: [
+                        { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 3 },
+                        { row: 2, col: 4 }, { row: 2, col: 5 }, { row: 2, col: 6 }, { row: 2, col: 7 },
+                        { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 },
+                        { row: 3, col: 4 }, { row: 3, col: 5 }, { row: 3, col: 6 }, { row: 3, col: 7 }
+                    ],
+                    speed: 120
+                },
+                walk: {
+                    frames: [
+                        { row: 4, col: 0 }, { row: 4, col: 1 }, { row: 4, col: 2 }, { row: 4, col: 3 },
+                        { row: 4, col: 4 }, { row: 4, col: 5 }, { row: 4, col: 6 }, { row: 4, col: 7 }
+                    ],
+                    speed: 80
+                },
+                run: {
+                    frames: [
+                        { row: 5, col: 0 }, { row: 5, col: 1 }, { row: 5, col: 2 }, { row: 5, col: 3 },
+                        { row: 5, col: 4 }, { row: 5, col: 5 }, { row: 5, col: 6 }, { row: 5, col: 7 }
+                    ],
+                    speed: 50
+                },
+                sleep: {
+                    frames: [
+                        { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 },
+                        { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 6, col: 6 }, { row: 6, col: 7 }
+                    ],
+                    speed: 200
+                },
+                eat: {
+                    frames: [
+                        { row: 7, col: 0 }, { row: 7, col: 1 }, { row: 7, col: 2 }, { row: 7, col: 3 },
+                        { row: 7, col: 4 }, { row: 7, col: 5 }, { row: 7, col: 6 }, { row: 7, col: 7 }
+                    ],
+                    speed: 100
+                },
+                jump: {
+                    frames: [
+                        { row: 8, col: 0 }, { row: 8, col: 1 }, { row: 8, col: 2 }, { row: 8, col: 3 },
+                        { row: 8, col: 4 }, { row: 8, col: 5 }, { row: 8, col: 6 }, { row: 8, col: 7 }
+                    ],
+                    speed: 80
+                },
+                scared: {
+                    frames: [
+                        { row: 9, col: 0 }, { row: 9, col: 1 }, { row: 9, col: 2 }, { row: 9, col: 3 },
+                        { row: 9, col: 4 }, { row: 9, col: 5 }, { row: 9, col: 6 }, { row: 9, col: 7 }
+                    ],
+                    speed: 60
+                }
+            };
 
-        let catX = 10;
-        let targetX = catX;
-        let currentAnimation = 'idle';
-        let currentFrame = 0;
-        let isFlipped = false;
-        let keystrokeCount = 0;
-        let fishEaten = 0;
-        let fishes = [];
-        let isEating = false;
-        let targetFish = null;
+            // ========== 游戏状态 ==========
+            const State = {
+                IDLE: 'idle',
+                CLEANING: 'cleaning', 
+                WALKING: 'walking',
+                RUNNING: 'running',
+                SLEEPING: 'sleeping',
+                EATING: 'eating',
+                JUMPING: 'jumping'
+            };
 
-        const STATES = { IDLE: 'idle', WALKING: 'walking', RUNNING: 'running', SITTING: 'sitting', EATING: 'eating' };
-        let catState = STATES.IDLE;
-        let stateTimer = 0;
-        let nextStateTime = 2000;
+            // ========== 猫咪类 ==========
+            class Cat {
+                constructor(element, container) {
+                    this.element = element;
+                    this.container = container;
+                    this.x = 10;
+                    this.targetX = 10;
+                    this.facingLeft = false;
+                    this.state = State.IDLE;
+                    this.animation = 'idle';
+                    this.frameIndex = 0;
+                    this.lastFrameTime = 0;
+                    this.stateTimer = 0;
+                    this.nextStateTime = 2000;
+                    this.isEating = false;
+                    this.targetFish = null;
+                    
+                    // 预计算精灵图背景尺寸
+                    this.bgWidth = SPRITE.cols * DISPLAY_SIZE;
+                    this.bgHeight = SPRITE.rows * DISPLAY_SIZE;
+                    this.element.style.backgroundSize = this.bgWidth + 'px ' + this.bgHeight + 'px';
+                    
+                    this.setFrame(0);
+                    this.updatePosition();
+                }
 
-        const cat = document.getElementById('cat');
-        const catContainer = document.getElementById('cat-container');
-        const counter = document.getElementById('counter');
-        const gameContainer = document.getElementById('game-container');
-        const fishCountEl = document.getElementById('fish-count');
-        const keystrokeCountEl = document.getElementById('keystroke-count');
+                getBounds() {
+                    const rect = this.container.getBoundingClientRect();
+                    return {
+                        minX: 5,
+                        maxX: Math.max(rect.width - DISPLAY_SIZE - 5, 60)
+                    };
+                }
 
-        function getContainerBounds() {
-            const rect = gameContainer.getBoundingClientRect();
-            return { minX: 5, maxX: Math.max(rect.width - SCALED_SIZE - 5, 60) };
-        }
+                setFrame(index) {
+                    const anim = ANIMATIONS[this.animation];
+                    if (!anim || !anim.frames[index]) return;
+                    
+                    const frame = anim.frames[index];
+                    const x = -frame.col * DISPLAY_SIZE;
+                    const y = -frame.row * DISPLAY_SIZE;
+                    this.element.style.backgroundPosition = x + 'px ' + y + 'px';
+                }
 
-        function setFrame(animation, frame) {
-            const anim = ANIMATIONS[animation];
-            if (!anim) return;
-            const col = frame % COLS;
-            const row = anim.row;
-            cat.style.backgroundPosition = (-col * SCALED_SIZE) + 'px ' + (-row * SCALED_SIZE) + 'px';
-        }
+                setAnimation(name) {
+                    if (this.animation === name) return;
+                    this.animation = name;
+                    this.frameIndex = 0;
+                    this.lastFrameTime = 0;
+                    this.setFrame(0);
+                }
 
-        let lastAnimTime = 0;
-        function animateSprite(timestamp) {
-            const anim = ANIMATIONS[currentAnimation];
-            if (anim && timestamp - lastAnimTime > anim.speed) {
-                currentFrame = (currentFrame + 1) % anim.frames;
-                setFrame(currentAnimation, currentFrame);
-                lastAnimTime = timestamp;
-            }
-            requestAnimationFrame(animateSprite);
-        }
+                setState(newState) {
+                    if (this.state === newState) return;
+                    this.state = newState;
+                    
+                    switch (newState) {
+                        case State.IDLE:
+                            this.setAnimation('idle');
+                            break;
+                        case State.CLEANING:
+                            this.setAnimation('clean');
+                            break;
+                        case State.WALKING:
+                            this.setAnimation('walk');
+                            break;
+                        case State.RUNNING:
+                            this.setAnimation('run');
+                            break;
+                        case State.SLEEPING:
+                            this.setAnimation('sleep');
+                            break;
+                        case State.EATING:
+                            this.setAnimation('eat');
+                            break;
+                        case State.JUMPING:
+                            this.setAnimation('jump');
+                            break;
+                    }
+                }
 
-        function updateCatPosition() {
-            catContainer.style.left = catX + 'px';
-            cat.classList.toggle('flip', isFlipped);
-        }
+                updatePosition() {
+                    // 使用 transform 来移动，比 left 更流畅
+                    const scaleX = this.facingLeft ? -1 : 1;
+                    this.container.style.transform = 'translateX(' + this.x + 'px) scaleX(' + scaleX + ')';
+                }
 
-        function spawnFish() {
-            const bounds = getContainerBounds();
-            const fishX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
-            const fish = document.createElement('div');
-            fish.className = 'fish dropping';
-            fish.innerHTML = '🐟';
-            fish.style.left = fishX + 'px';
-            fish.style.bottom = '25px';
-            gameContainer.appendChild(fish);
-            setTimeout(() => fish.classList.remove('dropping'), 300);
-            fishes.push({ element: fish, x: fishX });
-        }
+                updateAnimation(timestamp) {
+                    const anim = ANIMATIONS[this.animation];
+                    if (!anim) return;
 
-        function findNearestFish() {
-            if (fishes.length === 0) return null;
-            let nearest = null, minDist = Infinity;
-            for (const fish of fishes) {
-                const dist = Math.abs(fish.x - catX);
-                if (dist < minDist) { minDist = dist; nearest = fish; }
-            }
-            return nearest;
-        }
+                    if (timestamp - this.lastFrameTime >= anim.speed) {
+                        this.frameIndex = (this.frameIndex + 1) % anim.frames.length;
+                        this.setFrame(this.frameIndex);
+                        this.lastFrameTime = timestamp;
+                    }
+                }
 
-        function eatFish(fish) {
-            fish.element.classList.add('eaten');
-            setTimeout(() => fish.element.remove(), 300);
-            fishes = fishes.filter(f => f !== fish);
-            fishEaten++;
-            fishCountEl.textContent = fishEaten;
-        }
+                update(deltaTime, timestamp, fishes) {
+                    this.updateAnimation(timestamp);
+                    this.stateTimer += deltaTime;
 
-        function changeState(newState) {
-            catState = newState;
-            currentAnimation = newState === STATES.WALKING ? 'walk' : 
-                              newState === STATES.RUNNING ? 'run' : 
-                              newState === STATES.SITTING ? 'sit' : 
-                              newState === STATES.EATING ? 'eat' : 'idle';
-            currentFrame = 0;
-        }
+                    const bounds = this.getBounds();
+                    const walkSpeed = 0.04;
+                    const runSpeed = 0.12;
 
-        function decideNextAction() {
-            const bounds = getContainerBounds();
-            if (fishes.length > 0 && !isEating) {
-                targetFish = findNearestFish();
-                if (targetFish) { targetX = targetFish.x; changeState(STATES.RUNNING); return; }
-            }
-            const rand = Math.random();
-            if (rand < 0.3) {
-                targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
-                changeState(STATES.WALKING);
-                nextStateTime = 3000 + Math.random() * 3000;
-            } else if (rand < 0.5) {
-                targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
-                changeState(STATES.RUNNING);
-                nextStateTime = 2000 + Math.random() * 2000;
-            } else if (rand < 0.7) {
-                changeState(STATES.SITTING);
-                nextStateTime = 3000 + Math.random() * 4000;
-            } else {
-                changeState(STATES.IDLE);
-                nextStateTime = 2000 + Math.random() * 3000;
-            }
-        }
+                    // 处理移动状态
+                    if (this.state === State.WALKING || this.state === State.RUNNING) {
+                        const speed = this.state === State.RUNNING ? runSpeed : walkSpeed;
+                        const dx = this.targetX - this.x;
 
-        let lastTime = 0;
-        function gameLoop(timestamp) {
-            const deltaTime = timestamp - lastTime;
-            lastTime = timestamp;
-            stateTimer += deltaTime;
-            const bounds = getContainerBounds();
+                        if (Math.abs(dx) > 3) {
+                            this.facingLeft = dx < 0;
+                            this.x += Math.sign(dx) * speed * deltaTime;
+                            this.x = Math.max(bounds.minX, Math.min(bounds.maxX, this.x));
+                        } else {
+                            // 到达目标
+                            if (this.targetFish && fishes.includes(this.targetFish)) {
+                                this.isEating = true;
+                                this.setState(State.EATING);
+                                return { action: 'startEating', fish: this.targetFish };
+                            } else {
+                                this.stateTimer = this.nextStateTime;
+                            }
+                        }
+                    }
 
-            if (catState === STATES.WALKING || catState === STATES.RUNNING) {
-                const speed = catState === STATES.RUNNING ? 0.12 : 0.05;
-                const dx = targetX - catX;
-                if (Math.abs(dx) > 2) {
-                    isFlipped = dx < 0;
-                    catX += Math.sign(dx) * speed * deltaTime;
-                    catX = Math.max(bounds.minX, Math.min(bounds.maxX, catX));
-                } else {
-                    if (targetFish && fishes.includes(targetFish)) {
-                        isEating = true;
-                        changeState(STATES.EATING);
-                        setTimeout(() => {
-                            if (targetFish && fishes.includes(targetFish)) eatFish(targetFish);
-                            targetFish = null;
-                            isEating = false;
-                            stateTimer = 0;
-                            decideNextAction();
-                        }, 500);
+                    // 检查状态切换
+                    if (this.stateTimer >= this.nextStateTime && !this.isEating) {
+                        this.stateTimer = 0;
+                        return { action: 'decideNext' };
+                    }
+
+                    // 如果空闲且有鱼，去吃
+                    if ((this.state === State.IDLE || this.state === State.CLEANING || 
+                         this.state === State.SLEEPING) && fishes.length > 0 && !this.isEating) {
+                        this.stateTimer = this.nextStateTime;
+                    }
+
+                    this.updatePosition();
+                    return null;
+                }
+
+                goToFish(fish) {
+                    this.targetFish = fish;
+                    this.targetX = fish.x;
+                    this.setState(State.RUNNING);
+                }
+
+                finishEating() {
+                    this.targetFish = null;
+                    this.isEating = false;
+                    this.stateTimer = 0;
+                }
+
+                decideNextAction(hasFishes, bounds) {
+                    if (hasFishes && !this.isEating) {
+                        return 'goToFish';
+                    }
+
+                    const rand = Math.random();
+                    
+                    if (rand < 0.2) {
+                        // 走路
+                        this.targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
+                        this.setState(State.WALKING);
+                        this.nextStateTime = 3000 + Math.random() * 3000;
+                    } else if (rand < 0.35) {
+                        // 跑步
+                        this.targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
+                        this.setState(State.RUNNING);
+                        this.nextStateTime = 2000 + Math.random() * 2000;
+                    } else if (rand < 0.5) {
+                        // 清洁（舔毛）
+                        this.setState(State.CLEANING);
+                        this.nextStateTime = 3000 + Math.random() * 3000;
+                    } else if (rand < 0.65) {
+                        // 睡觉
+                        this.setState(State.SLEEPING);
+                        this.nextStateTime = 4000 + Math.random() * 4000;
                     } else {
-                        stateTimer = nextStateTime;
+                        // 空闲
+                        this.setState(State.IDLE);
+                        this.nextStateTime = 2000 + Math.random() * 2000;
+                    }
+                    
+                    return null;
+                }
+            }
+
+            // ========== 鱼类 ==========
+            class Fish {
+                constructor(x, container) {
+                    this.x = x;
+                    this.element = document.createElement('div');
+                    this.element.className = 'fish dropping';
+                    this.element.textContent = '🐟';
+                    this.element.style.left = x + 'px';
+                    this.element.style.bottom = '25px';
+                    container.appendChild(this.element);
+                    
+                    setTimeout(() => {
+                        this.element.classList.remove('dropping');
+                    }, 300);
+                }
+
+                remove() {
+                    this.element.classList.add('eaten');
+                    setTimeout(() => {
+                        if (this.element.parentNode) {
+                            this.element.parentNode.removeChild(this.element);
+                        }
+                    }, 300);
+                }
+            }
+
+            // ========== 游戏主类 ==========
+            class Game {
+                constructor() {
+                    this.catElement = document.getElementById('cat');
+                    this.catContainer = document.getElementById('cat-container');
+                    this.gameContainer = document.getElementById('game-container');
+                    this.counterElement = document.getElementById('counter');
+                    this.fishCountElement = document.getElementById('fish-count');
+                    this.keystrokeCountElement = document.getElementById('keystroke-count');
+                    
+                    this.cat = new Cat(this.catElement, this.catContainer);
+                    this.fishes = [];
+                    this.fishEaten = 0;
+                    this.keystrokeCount = 0;
+                    
+                    this.lastTime = 0;
+                    this.running = true;
+                    
+                    this.init();
+                }
+
+                init() {
+                    // 开始游戏循环
+                    requestAnimationFrame((t) => this.gameLoop(t));
+                    
+                    // 延迟开始行动
+                    setTimeout(() => {
+                        this.cat.decideNextAction(this.fishes.length > 0, this.cat.getBounds());
+                    }, 1000);
+                    
+                    // 通知扩展已就绪
+                    vscode.postMessage({ type: 'ready' });
+                }
+
+                gameLoop(timestamp) {
+                    if (!this.running) return;
+
+                    const deltaTime = this.lastTime ? timestamp - this.lastTime : 16;
+                    this.lastTime = timestamp;
+
+                    // 更新猫
+                    const result = this.cat.update(deltaTime, timestamp, this.fishes);
+                    
+                    if (result) {
+                        switch (result.action) {
+                            case 'startEating':
+                                setTimeout(() => {
+                                    this.eatFish(result.fish);
+                                    this.cat.finishEating();
+                                    this.cat.decideNextAction(this.fishes.length > 0, this.cat.getBounds());
+                                }, 600);
+                                break;
+                            case 'decideNext':
+                                const action = this.cat.decideNextAction(this.fishes.length > 0, this.cat.getBounds());
+                                if (action === 'goToFish') {
+                                    const nearestFish = this.findNearestFish();
+                                    if (nearestFish) {
+                                        this.cat.goToFish(nearestFish);
+                                    }
+                                }
+                                break;
+                        }
+                    }
+
+                    requestAnimationFrame((t) => this.gameLoop(t));
+                }
+
+                findNearestFish() {
+                    if (this.fishes.length === 0) return null;
+                    
+                    let nearest = null;
+                    let minDist = Infinity;
+                    
+                    for (const fish of this.fishes) {
+                        const dist = Math.abs(fish.x - this.cat.x);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearest = fish;
+                        }
+                    }
+                    return nearest;
+                }
+
+                spawnFish() {
+                    const bounds = this.cat.getBounds();
+                    const x = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
+                    const fish = new Fish(x, this.gameContainer);
+                    this.fishes.push(fish);
+                }
+
+                eatFish(fish) {
+                    fish.remove();
+                    this.fishes = this.fishes.filter(f => f !== fish);
+                    this.fishEaten++;
+                    this.fishCountElement.textContent = this.fishEaten.toString();
+                }
+
+                updateCounter(count) {
+                    this.keystrokeCount = count;
+                    this.counterElement.textContent = count.toString();
+                    this.keystrokeCountElement.textContent = count.toLocaleString();
+                }
+
+                reset() {
+                    this.updateCounter(0);
+                    this.fishEaten = 0;
+                    this.fishCountElement.textContent = '0';
+                    this.fishes.forEach(f => f.remove());
+                    this.fishes = [];
+                }
+
+                handleMessage(message) {
+                    switch (message.type) {
+                        case 'keystroke':
+                            this.updateCounter(message.count);
+                            if (message.spawnFish) {
+                                this.spawnFish();
+                            }
+                            break;
+                        case 'init':
+                            this.updateCounter(message.count);
+                            break;
+                        case 'reset':
+                            this.reset();
+                            break;
+                        case 'spawnFish':
+                            this.spawnFish();
+                            break;
                     }
                 }
             }
 
-            if (stateTimer >= nextStateTime && !isEating) { stateTimer = 0; decideNextAction(); }
-            if ((catState === STATES.IDLE || catState === STATES.SITTING) && fishes.length > 0) stateTimer = nextStateTime;
-
-            updateCatPosition();
-            requestAnimationFrame(gameLoop);
-        }
-
-        function updateCounter(count) {
-            keystrokeCount = count;
-            counter.textContent = count;
-            keystrokeCountEl.textContent = count.toLocaleString();
-        }
-
-        window.addEventListener('message', event => {
-            const message = event.data;
-            switch (message.type) {
-                case 'keystroke':
-                    updateCounter(message.count);
-                    if (message.spawnFish) spawnFish();
-                    break;
-                case 'init':
-                    updateCounter(message.count);
-                    break;
-                case 'reset':
-                    updateCounter(0);
-                    fishEaten = 0;
-                    fishCountEl.textContent = '0';
-                    fishes.forEach(f => f.element.remove());
-                    fishes = [];
-                    break;
-                case 'spawnFish':
-                    spawnFish();
-                    break;
-            }
-        });
-
-        setFrame('idle', 0);
-        updateCatPosition();
-        requestAnimationFrame(animateSprite);
-        requestAnimationFrame(gameLoop);
-        vscode.postMessage({ type: 'ready' });
-        setTimeout(() => decideNextAction(), 1000);
+            // ========== 启动游戏 ==========
+            const game = new Game();
+            
+            window.addEventListener('message', (event) => {
+                game.handleMessage(event.data);
+            });
+        })();
     </script>
 </body>
 </html>`;
