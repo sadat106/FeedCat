@@ -157,6 +157,9 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         const bgUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'media', 'background.png')
         );
+        const emotesUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'media', 'emotes.png')
+        );
 
         const nonce = getNonce();
 
@@ -197,19 +200,28 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             background-repeat: no-repeat;
             image-rendering: pixelated;
         }
-        #counter {
+        #emote {
             position: absolute;
-            top: 0;
+            top: -10px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85);
-            color: #FFD700;
-            padding: 3px 8px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: bold;
-            white-space: nowrap;
-            border: 1.5px solid #FFD700;
+            width: 32px;
+            height: 32px;
+            background-image: url('${emotesUri}');
+            background-repeat: no-repeat;
+            background-size: 384px 416px;
+            image-rendering: pixelated;
+            display: none;
+            z-index: 100;
+        }
+        #emote.show {
+            display: block;
+            animation: emoteFloat 0.5s ease-out;
+        }
+        @keyframes emoteFloat {
+            0% { transform: translateX(-50%) translateY(10px) scale(0.5); opacity: 0; }
+            50% { transform: translateX(-50%) translateY(-5px) scale(1.1); opacity: 1; }
+            100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
         }
         .fish {
             position: absolute;
@@ -242,7 +254,7 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
     <div id="stats">⌨️ <span id="keystroke-count">0</span> &nbsp;|&nbsp; 🐟 <span id="fish-count">0</span></div>
     <div id="game-container">
         <div id="cat-wrapper">
-            <div id="counter">0</div>
+            <div id="emote"></div>
             <div id="cat"></div>
         </div>
     </div>
@@ -289,21 +301,49 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 
         const catEl = document.getElementById('cat');
         const catWrapper = document.getElementById('cat-wrapper');
-        const counterEl = document.getElementById('counter');
+        const emoteEl = document.getElementById('emote');
         const gameContainer = document.getElementById('game-container');
         const fishCountEl = document.getElementById('fish-count');
         const keystrokeCountEl = document.getElementById('keystroke-count');
+
+        // 表情图配置 - 12列 x 13行，每个16x16，放大到32x32显示
+        const EMOTE_SIZE = 16;
+        const EMOTE_SCALE = 2;
+        const EMOTE_COLS = 12;
+        // 爱心位置：第7行第2列 (从1开始计数) = (row: 6, col: 1) 从0开始
+        const HEART_ROW = 6;
+        const HEART_COL = 1;
+        let emoteTimer = null;
 
         catEl.style.backgroundSize = (COLS * DISPLAY_SIZE) + 'px ' + (ROWS * DISPLAY_SIZE) + 'px';
         catEl.style.width = DISPLAY_SIZE + 'px';
         catEl.style.height = DISPLAY_SIZE + 'px';
         catWrapper.style.width = DISPLAY_SIZE + 'px';
 
+        // 设置表情背景位置
+        emoteEl.style.backgroundPosition = (-HEART_COL * EMOTE_SIZE * EMOTE_SCALE) + 'px ' + (-HEART_ROW * EMOTE_SIZE * EMOTE_SCALE) + 'px';
+
         let catX = 10, facingLeft = false;
         let currentAnim = 'idle', frameIndex = 0, lastFrameTime = 0;
         let state = 'idle', stateTimer = 0, nextStateTime = 2000;
         let isEating = false, targetFish = null;
         let fishes = [], fishEaten = 0, keystrokeCount = 0;
+
+        // 显示爱心表情
+        function showHeartEmote() {
+            if (emoteTimer) {
+                clearTimeout(emoteTimer);
+            }
+            emoteEl.classList.remove('show');
+            // 强制重绘以重新触发动画
+            void emoteEl.offsetWidth;
+            emoteEl.classList.add('show');
+            
+            emoteTimer = setTimeout(function() {
+                emoteEl.classList.remove('show');
+                emoteTimer = null;
+            }, 5000);
+        }
 
         function setFrame(animName, index) {
             const anim = ANIMS[animName];
@@ -427,6 +467,9 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             fishEaten++;
             fishCountEl.textContent = fishEaten;
             vscode.postMessage({ type: 'fishEaten', count: fishEaten });
+            
+            // 吃到鱼后显示爱心表情
+            showHeartEmote();
         }
 
         function findNearestFish() {
@@ -462,7 +505,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 
         function updateCounter(count) {
             keystrokeCount = count;
-            counterEl.textContent = count;
             keystrokeCountEl.textContent = count.toLocaleString();
         }
 
