@@ -76,7 +76,7 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
 
         const nonce = getNonce();
 
-        return `<!DOCTYPE html>
+        return /*html*/`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -84,101 +84,52 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} data:; script-src 'nonce-${nonce}';">
     <title>Feed Cat</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        html, body {
-            width: 100%;
-            height: 100%;
-            min-height: 120px;
-            overflow: hidden;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; min-height: 120px; overflow: hidden; }
         body {
-            background: linear-gradient(180deg, 
-                #87CEEB 0%, 
-                #7CB342 60%, 
-                #558B2F 100%
-            );
-            position: relative;
+            background: linear-gradient(180deg, #87CEEB 0%, #7CB342 60%, #558B2F 100%);
             font-family: 'Segoe UI', sans-serif;
         }
-
         .ground {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 40%;
+            position: absolute; bottom: 0; left: 0; right: 0; height: 40%;
             background: linear-gradient(180deg, #7CB342 0%, #558B2F 100%);
         }
-
         .sun {
-            position: absolute;
-            top: 5px;
-            right: 10px;
-            width: 20px;
-            height: 20px;
+            position: absolute; top: 5px; right: 10px; width: 20px; height: 20px;
             background: radial-gradient(circle, #FFD54F 0%, #FF9800 100%);
-            border-radius: 50%;
-            box-shadow: 0 0 10px #FFD54F;
+            border-radius: 50%; box-shadow: 0 0 10px #FFD54F;
         }
-
         .cloud {
-            position: absolute;
-            top: 8px;
-            left: 10px;
-            width: 25px;
-            height: 10px;
-            background: white;
-            border-radius: 10px;
-            opacity: 0.9;
+            position: absolute; top: 8px; left: 10px; width: 25px; height: 10px;
+            background: white; border-radius: 10px; opacity: 0.9;
         }
         .cloud::before {
-            content: '';
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: white;
-            border-radius: 50%;
-            top: -6px;
-            left: 5px;
+            content: ''; position: absolute; width: 12px; height: 12px;
+            background: white; border-radius: 50%; top: -6px; left: 5px;
         }
-
         #game-container {
+            position: absolute; bottom: 0; left: 0; right: 0; top: 30px;
+        }
+        #cat-wrapper {
+            position: absolute;
+            bottom: 5px;
+            left: 0;
+            width: 48px;
+            height: 68px;
+        }
+        #cat {
             position: absolute;
             bottom: 0;
             left: 0;
-            right: 0;
-            top: 30px;
-        }
-
-        #cat-container {
-            position: absolute;
-            bottom: 5px;
-            width: 48px;
-            height: 48px;
-            /* 使用 transform 而不是 left 来移动，避免闪烁 */
-            will-change: transform;
-        }
-
-        #cat {
             width: 48px;
             height: 48px;
             background-image: url('${spriteUri}');
             background-repeat: no-repeat;
             image-rendering: pixelated;
-            image-rendering: crisp-edges;
-            /* 预加载精灵图，避免闪烁 */
-            will-change: background-position;
         }
-
         #counter {
             position: absolute;
-            top: -20px;
+            top: 0;
             left: 50%;
             transform: translateX(-50%);
             background: rgba(0, 0, 0, 0.8);
@@ -188,525 +139,314 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
             font-size: 10px;
             font-weight: bold;
             white-space: nowrap;
-            z-index: 100;
             border: 1px solid #FFD700;
         }
-
         .fish {
             position: absolute;
             font-size: 16px;
             z-index: 50;
-            will-change: transform, opacity;
+            transition: opacity 0.3s;
         }
-
-        .fish.eaten {
-            animation: eaten 0.3s ease-out forwards;
-        }
-
-        @keyframes eaten {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(0); opacity: 0; }
-        }
-
-        @keyframes fishDrop {
-            0% { transform: translateY(-20px); opacity: 0; }
-            100% { transform: translateY(0); opacity: 1; }
-        }
-
-        .fish.dropping {
-            animation: fishDrop 0.3s ease-out forwards;
-        }
-
+        .fish.eaten { opacity: 0; transform: scale(0); }
         #stats {
-            position: absolute;
-            top: 3px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: white;
-            font-size: 9px;
-            z-index: 200;
+            position: absolute; top: 3px; left: 50%; transform: translateX(-50%);
+            color: white; font-size: 9px; z-index: 200;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
-            background: rgba(0,0,0,0.3);
-            padding: 2px 8px;
-            border-radius: 8px;
+            background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 8px;
         }
-
-        #stats span {
-            color: #FFD700;
-            font-weight: bold;
-        }
+        #stats span { color: #FFD700; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="sun"></div>
     <div class="cloud"></div>
     <div class="ground"></div>
-    
-    <div id="stats">
-        ⌨️ <span id="keystroke-count">0</span> | 🐟 <span id="fish-count">0</span>
-    </div>
-
+    <div id="stats">⌨️ <span id="keystroke-count">0</span> | 🐟 <span id="fish-count">0</span></div>
     <div id="game-container">
-        <div id="cat-container">
+        <div id="cat-wrapper">
             <div id="counter">0</div>
             <div id="cat"></div>
         </div>
     </div>
 
     <script nonce="${nonce}">
-        (function() {
-            'use strict';
+    (function() {
+        const vscode = acquireVsCodeApi();
+
+        // 精灵图配置: 256x320, 8列x10行, 每帧32x32
+        const FRAME_W = 32, FRAME_H = 32, COLS = 8, SCALE = 1.5;
+        const DISPLAY_W = FRAME_W * SCALE, DISPLAY_H = FRAME_H * SCALE;
+
+        // 动画行定义
+        // Row 0-1: Idle, Row 2-3: Clean, Row 4-5: Movement, Row 6: Sleep, Row 7: Paw, Row 8: Jump, Row 9: Scared
+        const ANIMS = {
+            idle:  { startRow: 0, rowCount: 2, framesPerRow: 8, speed: 150 },
+            clean: { startRow: 2, rowCount: 2, framesPerRow: 8, speed: 120 },
+            walk:  { startRow: 4, rowCount: 1, framesPerRow: 8, speed: 100 },
+            run:   { startRow: 5, rowCount: 1, framesPerRow: 8, speed: 60 },
+            sleep: { startRow: 6, rowCount: 1, framesPerRow: 8, speed: 250 },
+            eat:   { startRow: 7, rowCount: 1, framesPerRow: 8, speed: 100 },
+            jump:  { startRow: 8, rowCount: 1, framesPerRow: 8, speed: 80 },
+            scared:{ startRow: 9, rowCount: 1, framesPerRow: 8, speed: 60 }
+        };
+
+        // 获取动画的总帧数
+        function getTotalFrames(anim) {
+            return anim.rowCount * anim.framesPerRow;
+        }
+
+        // 根据帧索引获取行列
+        function getFramePos(anim, frameIndex) {
+            const localFrame = frameIndex % getTotalFrames(anim);
+            const rowOffset = Math.floor(localFrame / anim.framesPerRow);
+            const col = localFrame % anim.framesPerRow;
+            return { row: anim.startRow + rowOffset, col: col };
+        }
+
+        // DOM
+        const catEl = document.getElementById('cat');
+        const catWrapper = document.getElementById('cat-wrapper');
+        const counterEl = document.getElementById('counter');
+        const gameContainer = document.getElementById('game-container');
+        const fishCountEl = document.getElementById('fish-count');
+        const keystrokeCountEl = document.getElementById('keystroke-count');
+
+        // 初始化精灵图尺寸
+        catEl.style.backgroundSize = (COLS * DISPLAY_W) + 'px ' + (10 * DISPLAY_H) + 'px';
+        catEl.style.width = DISPLAY_W + 'px';
+        catEl.style.height = DISPLAY_H + 'px';
+        catWrapper.style.width = DISPLAY_W + 'px';
+
+        // 游戏状态
+        let catX = 10;
+        let targetX = 10;
+        let facingLeft = false;
+        let currentAnim = 'idle';
+        let frameIndex = 0;
+        let lastFrameTime = 0;
+        let state = 'idle'; // idle, clean, walk, run, sleep, eat
+        let stateTimer = 0;
+        let nextStateTime = 2000;
+        let isEating = false;
+        let targetFish = null;
+        let fishes = [];
+        let fishEaten = 0;
+        let keystrokeCount = 0;
+
+        // 设置精灵帧 - 最关键的函数，直接设置背景位置
+        function setFrame(anim, index) {
+            const a = ANIMS[anim];
+            if (!a) return;
+            const pos = getFramePos(a, index);
+            const bgX = -pos.col * DISPLAY_W;
+            const bgY = -pos.row * DISPLAY_H;
+            catEl.style.backgroundPosition = bgX + 'px ' + bgY + 'px';
+        }
+
+        // 设置猫的位置 - 使用 left 而非 transform，翻转用单独的 scaleX
+        function updateCatPosition() {
+            catWrapper.style.left = catX + 'px';
+            catEl.style.transform = facingLeft ? 'scaleX(-1)' : 'scaleX(1)';
+        }
+
+        // 切换动画
+        function setAnimation(name) {
+            if (currentAnim === name) return;
+            currentAnim = name;
+            frameIndex = 0;
+            setFrame(name, 0);
+        }
+
+        // 切换状态
+        function setState(newState) {
+            state = newState;
+            switch (newState) {
+                case 'idle': setAnimation('idle'); break;
+                case 'clean': setAnimation('clean'); break;
+                case 'walk': setAnimation('walk'); break;
+                case 'run': setAnimation('run'); break;
+                case 'sleep': setAnimation('sleep'); break;
+                case 'eat': setAnimation('eat'); break;
+            }
+        }
+
+        // 获取边界
+        function getBounds() {
+            const rect = gameContainer.getBoundingClientRect();
+            return { minX: 5, maxX: Math.max(rect.width - DISPLAY_W - 5, 60) };
+        }
+
+        // 生成鱼
+        function spawnFish() {
+            const bounds = getBounds();
+            const x = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
+            const fish = document.createElement('div');
+            fish.className = 'fish';
+            fish.textContent = '🐟';
+            fish.style.left = x + 'px';
+            fish.style.bottom = '25px';
+            gameContainer.appendChild(fish);
+            fishes.push({ el: fish, x: x });
+        }
+
+        // 吃鱼
+        function eatFish(fish) {
+            fish.el.classList.add('eaten');
+            setTimeout(() => fish.el.remove(), 300);
+            fishes = fishes.filter(f => f !== fish);
+            fishEaten++;
+            fishCountEl.textContent = fishEaten;
+        }
+
+        // 找最近的鱼
+        function findNearestFish() {
+            if (!fishes.length) return null;
+            let nearest = null, minD = Infinity;
+            for (const f of fishes) {
+                const d = Math.abs(f.x - catX);
+                if (d < minD) { minD = d; nearest = f; }
+            }
+            return nearest;
+        }
+
+        // 决定下一个行为
+        function decideNextAction() {
+            const bounds = getBounds();
             
-            const vscode = acquireVsCodeApi();
-
-            // ========== 精灵图配置 ==========
-            // 精灵图: 256x320, 8列x10行, 每帧32x32
-            // Row 0-1: Idle (空闲)
-            // Row 2-3: Clean (清洁/舔毛) 
-            // Row 4-5: Movement (移动)
-            // Row 6: Sleep (睡觉)
-            // Row 7: Paw (挥爪/吃东西)
-            // Row 8: Jump (跳跃)
-            // Row 9: Scared (受惊)
-            
-            const SPRITE = {
-                frameSize: 32,
-                scale: 1.5,
-                cols: 8,
-                rows: 10
-            };
-            const DISPLAY_SIZE = SPRITE.frameSize * SPRITE.scale; // 48px
-
-            // 动画定义 - 每个动画可以跨多行
-            const ANIMATIONS = {
-                idle: {
-                    frames: [
-                        { row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }, { row: 0, col: 3 },
-                        { row: 0, col: 4 }, { row: 0, col: 5 }, { row: 0, col: 6 }, { row: 0, col: 7 },
-                        { row: 1, col: 0 }, { row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 3 },
-                        { row: 1, col: 4 }, { row: 1, col: 5 }, { row: 1, col: 6 }, { row: 1, col: 7 }
-                    ],
-                    speed: 150
-                },
-                clean: {
-                    frames: [
-                        { row: 2, col: 0 }, { row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 3 },
-                        { row: 2, col: 4 }, { row: 2, col: 5 }, { row: 2, col: 6 }, { row: 2, col: 7 },
-                        { row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 },
-                        { row: 3, col: 4 }, { row: 3, col: 5 }, { row: 3, col: 6 }, { row: 3, col: 7 }
-                    ],
-                    speed: 120
-                },
-                walk: {
-                    frames: [
-                        { row: 4, col: 0 }, { row: 4, col: 1 }, { row: 4, col: 2 }, { row: 4, col: 3 },
-                        { row: 4, col: 4 }, { row: 4, col: 5 }, { row: 4, col: 6 }, { row: 4, col: 7 }
-                    ],
-                    speed: 80
-                },
-                run: {
-                    frames: [
-                        { row: 5, col: 0 }, { row: 5, col: 1 }, { row: 5, col: 2 }, { row: 5, col: 3 },
-                        { row: 5, col: 4 }, { row: 5, col: 5 }, { row: 5, col: 6 }, { row: 5, col: 7 }
-                    ],
-                    speed: 50
-                },
-                sleep: {
-                    frames: [
-                        { row: 6, col: 0 }, { row: 6, col: 1 }, { row: 6, col: 2 }, { row: 6, col: 3 },
-                        { row: 6, col: 4 }, { row: 6, col: 5 }, { row: 6, col: 6 }, { row: 6, col: 7 }
-                    ],
-                    speed: 200
-                },
-                eat: {
-                    frames: [
-                        { row: 7, col: 0 }, { row: 7, col: 1 }, { row: 7, col: 2 }, { row: 7, col: 3 },
-                        { row: 7, col: 4 }, { row: 7, col: 5 }, { row: 7, col: 6 }, { row: 7, col: 7 }
-                    ],
-                    speed: 100
-                },
-                jump: {
-                    frames: [
-                        { row: 8, col: 0 }, { row: 8, col: 1 }, { row: 8, col: 2 }, { row: 8, col: 3 },
-                        { row: 8, col: 4 }, { row: 8, col: 5 }, { row: 8, col: 6 }, { row: 8, col: 7 }
-                    ],
-                    speed: 80
-                },
-                scared: {
-                    frames: [
-                        { row: 9, col: 0 }, { row: 9, col: 1 }, { row: 9, col: 2 }, { row: 9, col: 3 },
-                        { row: 9, col: 4 }, { row: 9, col: 5 }, { row: 9, col: 6 }, { row: 9, col: 7 }
-                    ],
-                    speed: 60
+            // 有鱼就去吃
+            if (fishes.length > 0 && !isEating) {
+                targetFish = findNearestFish();
+                if (targetFish) {
+                    targetX = targetFish.x;
+                    setState('run');
+                    return;
                 }
-            };
+            }
 
-            // ========== 游戏状态 ==========
-            const State = {
-                IDLE: 'idle',
-                CLEANING: 'cleaning', 
-                WALKING: 'walking',
-                RUNNING: 'running',
-                SLEEPING: 'sleeping',
-                EATING: 'eating',
-                JUMPING: 'jumping'
-            };
+            // 随机行为
+            const r = Math.random();
+            if (r < 0.2) {
+                targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
+                setState('walk');
+                nextStateTime = 4000 + Math.random() * 3000;
+            } else if (r < 0.35) {
+                targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
+                setState('run');
+                nextStateTime = 2000 + Math.random() * 2000;
+            } else if (r < 0.5) {
+                setState('clean');
+                nextStateTime = 3000 + Math.random() * 3000;
+            } else if (r < 0.65) {
+                setState('sleep');
+                nextStateTime = 4000 + Math.random() * 4000;
+            } else {
+                setState('idle');
+                nextStateTime = 2000 + Math.random() * 2000;
+            }
+        }
 
-            // ========== 猫咪类 ==========
-            class Cat {
-                constructor(element, container) {
-                    this.element = element;
-                    this.container = container;
-                    this.x = 10;
-                    this.targetX = 10;
-                    this.facingLeft = false;
-                    this.state = State.IDLE;
-                    this.animation = 'idle';
-                    this.frameIndex = 0;
-                    this.lastFrameTime = 0;
-                    this.stateTimer = 0;
-                    this.nextStateTime = 2000;
-                    this.isEating = false;
-                    this.targetFish = null;
-                    
-                    // 预计算精灵图背景尺寸
-                    this.bgWidth = SPRITE.cols * DISPLAY_SIZE;
-                    this.bgHeight = SPRITE.rows * DISPLAY_SIZE;
-                    this.element.style.backgroundSize = this.bgWidth + 'px ' + this.bgHeight + 'px';
-                    
-                    this.setFrame(0);
-                    this.updatePosition();
-                }
+        // 更新计数器
+        function updateCounter(count) {
+            keystrokeCount = count;
+            counterEl.textContent = count;
+            keystrokeCountEl.textContent = count.toLocaleString();
+        }
 
-                getBounds() {
-                    const rect = this.container.getBoundingClientRect();
-                    return {
-                        minX: 5,
-                        maxX: Math.max(rect.width - DISPLAY_SIZE - 5, 60)
-                    };
-                }
+        // 主循环 - 使用固定时间步长避免闪烁
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            // 计算时间差
+            if (!lastTime) lastTime = timestamp;
+            const dt = timestamp - lastTime;
+            lastTime = timestamp;
 
-                setFrame(index) {
-                    const anim = ANIMATIONS[this.animation];
-                    if (!anim || !anim.frames[index]) return;
-                    
-                    const frame = anim.frames[index];
-                    const x = -frame.col * DISPLAY_SIZE;
-                    const y = -frame.row * DISPLAY_SIZE;
-                    this.element.style.backgroundPosition = x + 'px ' + y + 'px';
-                }
+            // 更新动画帧
+            const anim = ANIMS[currentAnim];
+            if (anim && timestamp - lastFrameTime >= anim.speed) {
+                frameIndex = (frameIndex + 1) % getTotalFrames(anim);
+                setFrame(currentAnim, frameIndex);
+                lastFrameTime = timestamp;
+            }
 
-                setAnimation(name) {
-                    if (this.animation === name) return;
-                    this.animation = name;
-                    this.frameIndex = 0;
-                    this.lastFrameTime = 0;
-                    this.setFrame(0);
-                }
+            // 更新状态计时
+            stateTimer += dt;
 
-                setState(newState) {
-                    if (this.state === newState) return;
-                    this.state = newState;
-                    
-                    switch (newState) {
-                        case State.IDLE:
-                            this.setAnimation('idle');
-                            break;
-                        case State.CLEANING:
-                            this.setAnimation('clean');
-                            break;
-                        case State.WALKING:
-                            this.setAnimation('walk');
-                            break;
-                        case State.RUNNING:
-                            this.setAnimation('run');
-                            break;
-                        case State.SLEEPING:
-                            this.setAnimation('sleep');
-                            break;
-                        case State.EATING:
-                            this.setAnimation('eat');
-                            break;
-                        case State.JUMPING:
-                            this.setAnimation('jump');
-                            break;
-                    }
-                }
-
-                updatePosition() {
-                    // 使用 transform 来移动，比 left 更流畅
-                    const scaleX = this.facingLeft ? -1 : 1;
-                    this.container.style.transform = 'translateX(' + this.x + 'px) scaleX(' + scaleX + ')';
-                }
-
-                updateAnimation(timestamp) {
-                    const anim = ANIMATIONS[this.animation];
-                    if (!anim) return;
-
-                    if (timestamp - this.lastFrameTime >= anim.speed) {
-                        this.frameIndex = (this.frameIndex + 1) % anim.frames.length;
-                        this.setFrame(this.frameIndex);
-                        this.lastFrameTime = timestamp;
-                    }
-                }
-
-                update(deltaTime, timestamp, fishes) {
-                    this.updateAnimation(timestamp);
-                    this.stateTimer += deltaTime;
-
-                    const bounds = this.getBounds();
-                    const walkSpeed = 0.04;
-                    const runSpeed = 0.12;
-
-                    // 处理移动状态
-                    if (this.state === State.WALKING || this.state === State.RUNNING) {
-                        const speed = this.state === State.RUNNING ? runSpeed : walkSpeed;
-                        const dx = this.targetX - this.x;
-
-                        if (Math.abs(dx) > 3) {
-                            this.facingLeft = dx < 0;
-                            this.x += Math.sign(dx) * speed * deltaTime;
-                            this.x = Math.max(bounds.minX, Math.min(bounds.maxX, this.x));
-                        } else {
-                            // 到达目标
-                            if (this.targetFish && fishes.includes(this.targetFish)) {
-                                this.isEating = true;
-                                this.setState(State.EATING);
-                                return { action: 'startEating', fish: this.targetFish };
-                            } else {
-                                this.stateTimer = this.nextStateTime;
+            // 处理移动
+            if (state === 'walk' || state === 'run') {
+                const speed = state === 'run' ? 0.1 : 0.04;
+                const dx = targetX - catX;
+                
+                if (Math.abs(dx) > 2) {
+                    facingLeft = dx < 0;
+                    catX += Math.sign(dx) * speed * dt;
+                    const bounds = getBounds();
+                    catX = Math.max(bounds.minX, Math.min(bounds.maxX, catX));
+                } else {
+                    // 到达目标
+                    if (targetFish && fishes.includes(targetFish)) {
+                        isEating = true;
+                        setState('eat');
+                        setTimeout(() => {
+                            if (targetFish && fishes.includes(targetFish)) {
+                                eatFish(targetFish);
                             }
-                        }
-                    }
-
-                    // 检查状态切换
-                    if (this.stateTimer >= this.nextStateTime && !this.isEating) {
-                        this.stateTimer = 0;
-                        return { action: 'decideNext' };
-                    }
-
-                    // 如果空闲且有鱼，去吃
-                    if ((this.state === State.IDLE || this.state === State.CLEANING || 
-                         this.state === State.SLEEPING) && fishes.length > 0 && !this.isEating) {
-                        this.stateTimer = this.nextStateTime;
-                    }
-
-                    this.updatePosition();
-                    return null;
-                }
-
-                goToFish(fish) {
-                    this.targetFish = fish;
-                    this.targetX = fish.x;
-                    this.setState(State.RUNNING);
-                }
-
-                finishEating() {
-                    this.targetFish = null;
-                    this.isEating = false;
-                    this.stateTimer = 0;
-                }
-
-                decideNextAction(hasFishes, bounds) {
-                    if (hasFishes && !this.isEating) {
-                        return 'goToFish';
-                    }
-
-                    const rand = Math.random();
-                    
-                    if (rand < 0.2) {
-                        // 走路
-                        this.targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
-                        this.setState(State.WALKING);
-                        this.nextStateTime = 3000 + Math.random() * 3000;
-                    } else if (rand < 0.35) {
-                        // 跑步
-                        this.targetX = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
-                        this.setState(State.RUNNING);
-                        this.nextStateTime = 2000 + Math.random() * 2000;
-                    } else if (rand < 0.5) {
-                        // 清洁（舔毛）
-                        this.setState(State.CLEANING);
-                        this.nextStateTime = 3000 + Math.random() * 3000;
-                    } else if (rand < 0.65) {
-                        // 睡觉
-                        this.setState(State.SLEEPING);
-                        this.nextStateTime = 4000 + Math.random() * 4000;
+                            targetFish = null;
+                            isEating = false;
+                            stateTimer = 0;
+                            decideNextAction();
+                        }, 600);
                     } else {
-                        // 空闲
-                        this.setState(State.IDLE);
-                        this.nextStateTime = 2000 + Math.random() * 2000;
-                    }
-                    
-                    return null;
-                }
-            }
-
-            // ========== 鱼类 ==========
-            class Fish {
-                constructor(x, container) {
-                    this.x = x;
-                    this.element = document.createElement('div');
-                    this.element.className = 'fish dropping';
-                    this.element.textContent = '🐟';
-                    this.element.style.left = x + 'px';
-                    this.element.style.bottom = '25px';
-                    container.appendChild(this.element);
-                    
-                    setTimeout(() => {
-                        this.element.classList.remove('dropping');
-                    }, 300);
-                }
-
-                remove() {
-                    this.element.classList.add('eaten');
-                    setTimeout(() => {
-                        if (this.element.parentNode) {
-                            this.element.parentNode.removeChild(this.element);
-                        }
-                    }, 300);
-                }
-            }
-
-            // ========== 游戏主类 ==========
-            class Game {
-                constructor() {
-                    this.catElement = document.getElementById('cat');
-                    this.catContainer = document.getElementById('cat-container');
-                    this.gameContainer = document.getElementById('game-container');
-                    this.counterElement = document.getElementById('counter');
-                    this.fishCountElement = document.getElementById('fish-count');
-                    this.keystrokeCountElement = document.getElementById('keystroke-count');
-                    
-                    this.cat = new Cat(this.catElement, this.catContainer);
-                    this.fishes = [];
-                    this.fishEaten = 0;
-                    this.keystrokeCount = 0;
-                    
-                    this.lastTime = 0;
-                    this.running = true;
-                    
-                    this.init();
-                }
-
-                init() {
-                    // 开始游戏循环
-                    requestAnimationFrame((t) => this.gameLoop(t));
-                    
-                    // 延迟开始行动
-                    setTimeout(() => {
-                        this.cat.decideNextAction(this.fishes.length > 0, this.cat.getBounds());
-                    }, 1000);
-                    
-                    // 通知扩展已就绪
-                    vscode.postMessage({ type: 'ready' });
-                }
-
-                gameLoop(timestamp) {
-                    if (!this.running) return;
-
-                    const deltaTime = this.lastTime ? timestamp - this.lastTime : 16;
-                    this.lastTime = timestamp;
-
-                    // 更新猫
-                    const result = this.cat.update(deltaTime, timestamp, this.fishes);
-                    
-                    if (result) {
-                        switch (result.action) {
-                            case 'startEating':
-                                setTimeout(() => {
-                                    this.eatFish(result.fish);
-                                    this.cat.finishEating();
-                                    this.cat.decideNextAction(this.fishes.length > 0, this.cat.getBounds());
-                                }, 600);
-                                break;
-                            case 'decideNext':
-                                const action = this.cat.decideNextAction(this.fishes.length > 0, this.cat.getBounds());
-                                if (action === 'goToFish') {
-                                    const nearestFish = this.findNearestFish();
-                                    if (nearestFish) {
-                                        this.cat.goToFish(nearestFish);
-                                    }
-                                }
-                                break;
-                        }
-                    }
-
-                    requestAnimationFrame((t) => this.gameLoop(t));
-                }
-
-                findNearestFish() {
-                    if (this.fishes.length === 0) return null;
-                    
-                    let nearest = null;
-                    let minDist = Infinity;
-                    
-                    for (const fish of this.fishes) {
-                        const dist = Math.abs(fish.x - this.cat.x);
-                        if (dist < minDist) {
-                            minDist = dist;
-                            nearest = fish;
-                        }
-                    }
-                    return nearest;
-                }
-
-                spawnFish() {
-                    const bounds = this.cat.getBounds();
-                    const x = Math.random() * (bounds.maxX - bounds.minX) + bounds.minX;
-                    const fish = new Fish(x, this.gameContainer);
-                    this.fishes.push(fish);
-                }
-
-                eatFish(fish) {
-                    fish.remove();
-                    this.fishes = this.fishes.filter(f => f !== fish);
-                    this.fishEaten++;
-                    this.fishCountElement.textContent = this.fishEaten.toString();
-                }
-
-                updateCounter(count) {
-                    this.keystrokeCount = count;
-                    this.counterElement.textContent = count.toString();
-                    this.keystrokeCountElement.textContent = count.toLocaleString();
-                }
-
-                reset() {
-                    this.updateCounter(0);
-                    this.fishEaten = 0;
-                    this.fishCountElement.textContent = '0';
-                    this.fishes.forEach(f => f.remove());
-                    this.fishes = [];
-                }
-
-                handleMessage(message) {
-                    switch (message.type) {
-                        case 'keystroke':
-                            this.updateCounter(message.count);
-                            if (message.spawnFish) {
-                                this.spawnFish();
-                            }
-                            break;
-                        case 'init':
-                            this.updateCounter(message.count);
-                            break;
-                        case 'reset':
-                            this.reset();
-                            break;
-                        case 'spawnFish':
-                            this.spawnFish();
-                            break;
+                        stateTimer = nextStateTime; // 触发状态切换
                     }
                 }
             }
 
-            // ========== 启动游戏 ==========
-            const game = new Game();
-            
-            window.addEventListener('message', (event) => {
-                game.handleMessage(event.data);
-            });
-        })();
+            // 检查是否需要切换状态
+            if (stateTimer >= nextStateTime && !isEating) {
+                stateTimer = 0;
+                decideNextAction();
+            }
+
+            // 空闲时发现鱼
+            if ((state === 'idle' || state === 'clean' || state === 'sleep') && fishes.length > 0 && !isEating) {
+                stateTimer = nextStateTime;
+            }
+
+            updateCatPosition();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 消息处理
+        window.addEventListener('message', e => {
+            const msg = e.data;
+            switch (msg.type) {
+                case 'keystroke':
+                    updateCounter(msg.count);
+                    if (msg.spawnFish) spawnFish();
+                    break;
+                case 'init':
+                    updateCounter(msg.count);
+                    break;
+                case 'reset':
+                    updateCounter(0);
+                    fishEaten = 0;
+                    fishCountEl.textContent = '0';
+                    fishes.forEach(f => f.el.remove());
+                    fishes = [];
+                    break;
+                case 'spawnFish':
+                    spawnFish();
+                    break;
+            }
+        });
+
+        // 初始化
+        setFrame('idle', 0);
+        updateCatPosition();
+        setTimeout(() => decideNextAction(), 1000);
+        requestAnimationFrame(gameLoop);
+        vscode.postMessage({ type: 'ready' });
+    })();
     </script>
 </body>
 </html>`;
