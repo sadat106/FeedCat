@@ -3,7 +3,7 @@
   "displayName": "Feed Cat - Coding Companion",
   "description": "A cute cat companion that lives in your VSCode. Feed it by typing code!",
   "version": "0.0.2",
-  "publisher": "feedcat",
+  "publisher": "lannes",
   "engines": {
     "vscode": "^1.74.0"
   },
