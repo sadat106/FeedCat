@@ -154,6 +154,9 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         const spriteUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this._extensionUri, 'media', 'cat-sprite.png')
         );
+        const bgUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'media', 'background.png')
+        );
 
         const nonce = getNonce();
 
@@ -168,25 +171,11 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { width: 100%; height: 100%; min-height: 120px; overflow: hidden; }
         body {
-            background: linear-gradient(180deg, #87CEEB 0%, #7CB342 60%, #558B2F 100%);
+            background-image: url('${bgUri}');
+            background-size: cover;
+            background-position: center bottom;
+            background-repeat: no-repeat;
             font-family: 'Segoe UI', sans-serif;
-        }
-        .ground {
-            position: absolute; bottom: 0; left: 0; right: 0; height: 40%;
-            background: linear-gradient(180deg, #7CB342 0%, #558B2F 100%);
-        }
-        .sun {
-            position: absolute; top: 8px; right: 12px; width: 24px; height: 24px;
-            background: radial-gradient(circle, #FFD54F 0%, #FF9800 100%);
-            border-radius: 50%; box-shadow: 0 0 12px #FFD54F;
-        }
-        .cloud {
-            position: absolute; top: 12px; left: 12px; width: 30px; height: 12px;
-            background: white; border-radius: 12px; opacity: 0.9;
-        }
-        .cloud::before {
-            content: ''; position: absolute; width: 14px; height: 14px;
-            background: white; border-radius: 50%; top: -7px; left: 6px;
         }
         #game-container {
             position: absolute; bottom: 0; left: 0; right: 0; top: 45px;
@@ -250,9 +239,6 @@ export class CatViewProvider implements vscode.WebviewViewProvider {
     </style>
 </head>
 <body>
-    <div class="sun"></div>
-    <div class="cloud"></div>
-    <div class="ground"></div>
     <div id="stats">⌨️ <span id="keystroke-count">0</span> &nbsp;|&nbsp; 🐟 <span id="fish-count">0</span></div>
     <div id="game-container">
         <div id="cat-wrapper">
